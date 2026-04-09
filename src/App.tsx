@@ -106,8 +106,8 @@ function Tutorial() {
 
   return (
     <>
-      <div className="modal-backdrop" role="dialog" aria-modal="true" style={{ background: "transparent", pointerEvents: "none" }}>
-        <div className="modal tutorial-modal" style={{ pointerEvents: "auto" }}>
+      <div className="modal-backdrop" role="dialog" aria-modal="true" style={{ background: "transparent", pointerEvents: "none", zIndex: 9995 }}>
+        <div className="modal tutorial-modal" style={{ pointerEvents: "auto", zIndex: 9996 }}>
           <div className="tutorial-progress">
             {tutorialSteps.map((_, i) => (
               <div
@@ -192,14 +192,14 @@ function HighlightOverlay({ target }: { target: string }) {
     <div style={{
       position: "fixed",
       inset: 0,
-      zIndex: 9999,
+      zIndex: 9990,
       pointerEvents: "none",
     }}>
       <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
         <path
           d={path}
           fill="rgba(0,0,0,0.7)"
-          style={{ pointerEvents: "auto" }}
+          style={{ pointerEvents: "none" }}
         />
       </svg>
       <div style={{
@@ -212,7 +212,7 @@ function HighlightOverlay({ target }: { target: string }) {
         borderRadius: "12px",
         boxShadow: "0 0 30px rgba(255, 215, 0, 0.6), inset 0 0 20px rgba(255, 215, 0, 0.3)",
         animation: "pulse 1s ease-in-out infinite",
-        pointerEvents: "auto",
+        pointerEvents: "none",
       }}>
       </div>
       <style>{`

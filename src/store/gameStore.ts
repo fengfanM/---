@@ -1561,6 +1561,8 @@ export const useGameStore = create<GameState>()(
       },
 
       triggerRewardAnimation: (type: "coins" | "card" | "achievement" | "level", amount: number) => {
+        const state = get();
+        if (!state.tutorialCompleted) return;
         set({ rewardAnimation: { visible: true, type, amount } });
       },
 
