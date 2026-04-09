@@ -1,0 +1,17 @@
+[
+  {
+    "id": "permanent",
+    "name": "常驻 · 星河池",
+    "desc": "概率稳定，适合日常积累。",
+    "ssrUpRate": 0,
+    "upSsrIds": []
+  },
+  {
+    "id": "limited_yao",
+    "name": "限定 · 曜灵·启明UP",
+    "desc": "SSR 出现时，50% 概率为 UP；若歪一次，下次 SSR 必定 UP。",
+    "ssrUpRate": 0.5,
+    "upSsrIds": ["ssr_void_01"]
+  }
+]
+

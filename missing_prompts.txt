@@ -1,0 +1,41 @@
+========== 缺少的 6 张卡牌提示词 ==========
+
+【10. SR 卡牌 - 曜日·澄空】
+【卡片ID】sr_sun_03
+【名称】曜日·澄空
+【元素】木
+【关键词】生长，协作
+【完整提示词】
+Onmyoji-style character, wood element, wearing an extremely ornate kimono with embroidery that looks like growing cherry blossom vines, holding a tattered folding fan or a flute, surrounded by floating sakura petals and paper ofuda talismans swirling around, gentle warm daylight, strong top-down lighting to highlight the textures, polished anime look, full body, slightly low-angle shot, dynamic elegant pose, ukiyo-e art style mixed with modern high-end game illustration, vibrant but slightly desaturated colors, high detail, clean linework, soft ink wash, gold foil accents, centered composition, plain dark background, no text, no watermark
+
+【11. SR 卡牌 - 曜日·深流】
+【卡片ID】sr_sun_04
+【名称】曜日·深流
+【元素】水
+【关键词】洞察，共情
+【完整提示词】
+Onmyoji-style character, water element, wearing an extremely ornate layered kimono with ocean wave patterns, holding a classic waxed paper umbrella, the sleeves flow like cascading water, surrounding ripples in the air, deep blue and turquoise lighting, reflections on wet surfaces, polished anime look, full body, slightly low-angle shot, dynamic elegant pose, ukiyo-e art style mixed with modern high-end game illustration, vibrant but slightly desaturated colors, high detail, clean linework, soft ink wash, gold foil accents, centered composition, plain dark background, no text, no watermark
+
+【12. SSR 卡牌 - 天机·太一】
+【卡片ID】ssr_void_01
+【名称】天机·太一
+【元素】空
+【关键词】变数，机缘
+【完整提示词】
+Onmyoji-style character, void element, wearing an extremely elaborate and layered ceremonial kimono with intricate gold embroidery and constellation patterns, holding a complex fox mask slightly off the face, standing in front of a glowing yin-yang seal barrier floating mid-air, cinematic dramatic lighting, strong god-ray rim light, polished premium anime look, full body, slightly low-angle epic shot, powerful but elegant pose, ukiyo-e art style mixed with modern high-end triple-A game illustration, vibrant colors, extreme high detail, clean linework, soft ink wash, heavy gold foil accents, subtle fractal patterns in the background aura, centered composition, plain dark background, no text, no watermark
+
+【13. SSR 卡牌 - 天机·归藏】
+【卡片ID】ssr_void_02
+【名称】天机·归藏
+【元素】空
+【关键词】因果，转折
+【完整提示词】
+Onmyoji-style character, void element, wearing an extremely elaborate and layered ceremonial kimono with intricate gold embroidery and constellation patterns, holding a complex fox mask slightly off the face, standing in front of a glowing yin-yang seal barrier floating mid-air, cinematic dramatic lighting, strong god-ray rim light, polished premium anime look, full body, slightly low-angle epic shot, powerful but elegant pose, ukiyo-e art style mixed with modern high-end triple-A game illustration, vibrant colors, extreme high detail, clean linework, soft ink wash, heavy gold foil accents, subtle fractal patterns in the background aura, centered composition, plain dark background, no text, no watermark
+
+【14. SSR 卡牌 - 天机·无极】
+【卡片ID】ssr_void_03
+【名称】天机·无极
+【元素】空
+【关键词】无限，觉醒
+【完整提示词】
+Onmyoji-style character, void element, wearing an extremely elaborate and layered ceremonial kimono with intricate gold embroidery and constellation patterns, holding a complex fox mask slightly off the face, standing in front of a glowing yin-yang seal barrier floating mid-air, cinematic dramatic lighting, strong god-ray rim light, polished premium anime look, full body, slightly low-angle epic shot, powerful but elegant pose, ukiyo-e art style mixed with modern high-end triple-A game illustration, vibrant colors, extreme high detail, clean linework, soft ink wash, heavy gold foil accents, subtle fractal patterns in the background aura, centered composition, plain dark background, no text, no watermark
