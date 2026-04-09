@@ -25,6 +25,9 @@ import { fetchHistory as fetchHistoryApi } from "./backend/api";
 import { cardFrontUrl, ensureAudio, playSfx, portraitUrlForId, talismanUrl } from "./lib/gameAssets";
 import { ACHIEVEMENT_LEVEL_REWARDS } from "./store/gameStore";
 import { PortraitWorkshop } from "./features/portraits/PortraitWorkshop";
+import { AchievementNotification } from "./components/Notification";
+import { LoadingOverlay } from "./components/Loading";
+import { StatsDashboard } from "./components/StatsDashboard";
 
 function rarityClass(r: string): string {
   if (r === "SSR") return "rarity-ssr";
@@ -1333,6 +1336,9 @@ export default function App() {
           onDismiss={dismissRewardAnimation} 
         />
       )}
+      
+      <AchievementNotification />
+      <LoadingOverlay />
     </div>
   );
 }
@@ -1678,6 +1684,8 @@ function GachaTab({
   const freePulls = useGameStore((s) => s.freePulls);
   const wheelBuff = useGameStore((s) => s.wheelBuff);
   const soundOn = useGameStore((s) => s.settings.soundOn);
+  const pullsSinceSR = useGameStore((s) => s.pullsSinceSR);
+  const pullsSinceSSR = useGameStore((s) => s.pullsSinceSSR);
   const wild = wheelBuff?.id === "wild";
   const tenCost = wild ? 70 : 80;
   const currentPool = pools.find((p) => p.id === activePoolId) ?? pools[0]!;
@@ -1693,6 +1701,87 @@ function GachaTab({
             <span className="gacha-poolname">{currentPool.name}</span>
             <span className="gacha-dot">·</span>
             <span className="gacha-pooldesc">{currentPool.desc}</span>
+          </div>
+        </div>
+
+        <div className="gacha-guarantee-section">
+          <div className="gacha-guarantee-title">
+            🎯 当前保底进度
+          </div>
+          <div className="gacha-guarantee-grid">
+            <div className={`gacha-guarantee-item ${pullsSinceSR >= 7 ? 'sr-warning' : ''}`}>
+              <div className="gacha-guarantee-header">
+                <span className="gacha-guarantee-label">SR 保底</span>
+                <span 
+                  className="gacha-guarantee-value"
+                  style={{
+                    color: pullsSinceSR >= 7 ? '#ff6b6b' : pullsSinceSR >= 5 ? '#ffa94d' : 'var(--ink)'
+                  }}
+                >
+                  {10 - pullsSinceSR}/10
+                </span>
+              </div>
+              <div className="gacha-guarantee-progress">
+                <div 
+                  className="gacha-guarantee-bar"
+                  style={{
+                    width: `${(pullsSinceSR / 10) * 100}%`,
+                    background: pullsSinceSR >= 7 
+                      ? 'linear-gradient(90deg, #ff6b6b, #ff8787)' 
+                      : pullsSinceSR >= 5 
+                        ? 'linear-gradient(90deg, #ffa94d, #ffd43b)' 
+                        : 'linear-gradient(90deg, #9370db, #b495e8)'
+                  }}
+                />
+              </div>
+              {pullsSinceSR >= 5 && (
+                <div 
+                  className="gacha-guarantee-hint"
+                  style={{
+                    color: pullsSinceSR >= 7 ? '#ff6b6b' : '#ffa94d'
+                  }}
+                >
+                  {pullsSinceSR >= 7 ? '🔥 即将保底！' : '⚠️ 接近保底'}
+                </div>
+              )}
+            </div>
+            
+            <div className={`gacha-guarantee-item ${pullsSinceSSR >= 40 ? 'ssr-warning' : ''}`}>
+              <div className="gacha-guarantee-header">
+                <span className="gacha-guarantee-label">SSR 保底</span>
+                <span 
+                  className="gacha-guarantee-value"
+                  style={{
+                    color: pullsSinceSSR >= 40 ? '#ff6b6b' : pullsSinceSSR >= 30 ? '#ffa94d' : 'var(--ink)'
+                  }}
+                >
+                  {50 - pullsSinceSSR}/50
+                </span>
+              </div>
+              <div className="gacha-guarantee-progress">
+                <div 
+                  className="gacha-guarantee-bar"
+                  style={{
+                    width: `${(pullsSinceSSR / 50) * 100}%`,
+                    background: pullsSinceSSR >= 40 
+                      ? 'linear-gradient(90deg, #ff6b6b, #ff8787)' 
+                      : pullsSinceSSR >= 30 
+                        ? 'linear-gradient(90deg, #ffa94d, #ffd43b)' 
+                        : 'linear-gradient(90deg, #d8b25d, #f0d78c)'
+                  }}
+                />
+              </div>
+              {pullsSinceSSR >= 30 && (
+                <div 
+                  className="gacha-guarantee-hint"
+                  style={{
+                    color: pullsSinceSSR >= 40 ? '#ff6b6b' : '#ffa94d'
+                  }}
+                >
+                  {pullsSinceSSR >= 40 ? '🔥 即将保底！' : '⚠️ 接近保底'}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1718,7 +1807,7 @@ function GachaTab({
             if (soundOn) void playSfx("click", 0.5);
             onOpenHistory();
           }}>
-            后端历史
+            抽卡记录
           </button>
         </div>
 
@@ -1892,6 +1981,7 @@ function FortuneTab() {
 }
 
 function ProgressTab() {
+  const [activeTab, setActiveTab] = useState('daily');
   const taskProgress = useGameStore((s) => s.taskProgress);
   const taskClaimed = useGameStore((s) => s.taskClaimed);
   const taskClaimedDay = useGameStore((s) => s.taskClaimedDay);
@@ -1949,8 +2039,15 @@ function ProgressTab() {
 
   const isCheckedInToday = checkInDate === t;
 
+  const tabs = [
+    { id: 'daily', label: '每日', icon: '日' },
+    { id: 'weekly', label: '每周', icon: '周' },
+    { id: 'achievements', label: '成就', icon: '成' },
+    { id: 'shop', label: '商店', icon: '商' }
+  ];
+
   return (
-    <div className="panel scroll-panel">
+    <div className="panel">
       <div className="scroll-banner scroll-banner-tasks" aria-hidden />
       <div className="scroll-head">
         <div className="scroll-kicker">阴阳寮 · 日课</div>
@@ -1981,601 +2078,645 @@ function ProgressTab() {
         );
       })()}
 
-      <div className="scroll-section">
-        <div className="scroll-section-title">每日签到</div>
-        <div className="scroll-list">
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">今日签到</span>
-                <span className="scroll-meta">
-                  连续 {checkInStreak} 天 · 累计 {totalCheckIns} 次
-                </span>
-              </div>
-              <div className="scroll-row2">
-                每日签到可获得卦石，连续签到奖励递增
-              </div>
-            </div>
-            <div>
-              {checkInAnimation && (
-                <div style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  background: "var(--success)",
-                  color: "white",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.5rem",
-                  fontWeight: 700,
-                  animation: "popIn 0.3s ease-out"
-                }}>
-                  +{lastReward} 卦石
-                </div>
-              )}
-              <button
-                type="button"
-                className={isCheckedInToday ? "btn btn-paper" : "btn btn-primary"}
-                disabled={isCheckedInToday}
-                onClick={handleCheckIn}
-                data-highlight-target="checkin-button"
-                aria-label={isCheckedInToday ? "今日已签到" : "点击立即签到领取灵石奖励"}
-                aria-pressed={isCheckedInToday}
-              >
-                {isCheckedInToday ? "已签到" : "立即签到"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* 顶部导航 */}
+      <div className="progress-tabs">
+        {tabs.map(tab => (
+          <button 
+            key={tab.id}
+            className={`progress-tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+            aria-label={`切换到${tab.label}标签页`}
+            aria-pressed={activeTab === tab.id}
+          >
+            <span className="tab-icon" aria-hidden>{tab.icon}</span>
+            <span className="tab-label">{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="scroll-section">
-        <div className="scroll-section-title">成就等级</div>
-        <div className="scroll-list">
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">成就等级 {achievementLevel()}</span>
-                <span className="scroll-meta">
-                  {achievementPoints()} 点成就点数
-                </span>
-              </div>
-              <div className="scroll-row2">
-                收集更多卡牌、完成每日任务来提升成就等级
-              </div>
-            </div>
-            <div className="achv-badge ok">
-              <span className="status-text">Lv.{achievementLevel()}</span>
-            </div>
-          </div>
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">图鉴收集</span>
-                <span className="scroll-meta">
-                  {ownedCount} / {totalCount} · {collectionProgress}%
-                </span>
-              </div>
-              <div className="progressbar" style={{ marginTop: "0.5rem" }} aria-hidden>
-                <div className="progressbar-fill" style={{ width: `${collectionProgress}%` }} />
-              </div>
-            </div>
-          </div>
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">游戏统计</span>
-              </div>
-              <div className="scroll-row2" style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                gap: "0.5rem",
-                marginTop: "0.5rem"
-              }}>
-                <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>总抽卡</div>
-                  <div style={{ fontWeight: 700 }}>{stats.totalPulls}</div>
-                </div>
-                <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>SSR 获得</div>
-                  <div style={{ fontWeight: 700, color: "var(--accent)" }}>{stats.totalSsr}</div>
-                </div>
-                <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>SR 获得</div>
-                  <div style={{ fontWeight: 700, color: "#ff9f43" }}>{stats.totalSr}</div>
-                </div>
-                <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>任务完成</div>
-                  <div style={{ fontWeight: 700 }}>{stats.taskCompletedCount}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">成就等级奖励</div>
-        <div className="scroll-list">
-          {ACHIEVEMENT_LEVEL_REWARDS.map((reward) => {
-            const isClaimed = achievementLevelRewardsClaimed[reward.level];
-            const isUnlocked = achievementLevel() >= reward.level;
-            const canClaim = isUnlocked && !isClaimed;
-
-            const handleClaim = () => {
-              if (!canClaim) return;
-              if (soundOn) void playSfx("achievement", 0.8);
-              claimAchievementLevelReward(reward.level);
-            };
-
-            return (
-              <div key={reward.level} className={`task-card ${isClaimed ? "claimed" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  级
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{reward.title}</div>
-                    <div className="task-meta">
-                      Lv.{reward.level}
+      {/* 内容区域 */}
+      <div className="progress-content scroll-panel">
+        {/* 每日标签页 */}
+        {activeTab === 'daily' && (
+          <div className="daily-section">
+            <div className="scroll-section">
+              <div className="scroll-section-title">每日签到</div>
+              <div className="scroll-list">
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">今日签到</span>
+                      <span className="scroll-meta">
+                        连续 {checkInStreak} 天 · 累计 {totalCheckIns} 次
+                      </span>
+                    </div>
+                    <div className="scroll-row2">
+                      每日签到可获得卦石，连续签到奖励递增
                     </div>
                   </div>
-                  {reward.description && (
-                    <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                      {reward.description}
-                    </div>
-                  )}
-                </div>
-                <div className="task-side">
-                  <div className="task-reward">
-                    <span className="reward-ico" aria-hidden>
-                      石
-                    </span>
-                    <span className="reward-num">{reward.reward}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={canClaim ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!canClaim}
-                    onClick={handleClaim}
-                  >
-                    {isClaimed ? "已领取" : isUnlocked ? "领取奖励" : "未解锁"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">每日特权</div>
-        <div className="scroll-list">
-          {DAILY_PRIVILEGES.map((priv) => {
-            const isUnlocked = achievementLevel() >= priv.requiredLevel;
-            const usage = dailyPrivilegeUsage;
-            const isUsed = usage.date === t && usage.used[priv.id];
-
-            const handleUse = () => {
-              if (!isUnlocked || isUsed) return;
-              if (soundOn) void playSfx("success", 0.7);
-              const result = useDailyPrivilege(priv.id);
-              if (result.success && (priv.id === "priv_free_pull" || priv.id === "priv_extra_coins")) {
-                setLastReward(priv.id === "priv_extra_coins" ? 50 : 1);
-                setCheckInAnimation(true);
-                setTimeout(() => setCheckInAnimation(false), 2000);
-              }
-            };
-
-            return (
-              <div key={priv.id} className={`task-card ${isUsed ? "claimed" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  权
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{priv.title}</div>
-                    <div className="task-meta">
-                      Lv.{priv.requiredLevel}
-                    </div>
-                  </div>
-                  <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                    {priv.description}
-                  </div>
-                </div>
-                <div className="task-side">
-                  <button
-                    type="button"
-                    className={isUnlocked && !isUsed ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!isUnlocked || isUsed}
-                    onClick={handleUse}
-                  >
-                    {isUsed ? "今日已用" : isUnlocked ? "立即使用" : "未解锁"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">成就商店</div>
-        <div className="scroll-list">
-          {ACHIEVEMENT_SHOP_ITEMS.map((item) => {
-            const canAfford = achievementPoints() >= item.cost;
-            const purchased = achievementShopPurchased[item.id] || 0;
-
-            const handlePurchase = () => {
-              if (!canAfford) return;
-              if (soundOn) void playSfx("reward", 0.7);
-              const result = purchaseFromAchievementShop(item.id);
-              if (result.success) {
-                setLastReward(item.value);
-                setCheckInAnimation(true);
-                setTimeout(() => setCheckInAnimation(false), 2000);
-              }
-            };
-
-            return (
-              <div key={item.id} className="task-card">
-                <div className="task-ico" aria-hidden>
-                  商
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{item.title}</div>
-                    <div className="task-meta">
-                      {purchased} 次兑换
-                    </div>
-                  </div>
-                  <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                    {item.description}
-                  </div>
-                </div>
-                <div className="task-side">
-                  <div className="task-reward">
-                    <span className="reward-ico" aria-hidden>
-                      点
-                    </span>
-                    <span className="reward-num">{item.cost}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={canAfford ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!canAfford}
-                    onClick={handlePurchase}
-                  >
-                    兑换
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">每日活跃奖励</div>
-        <div className="scroll-list">
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">今日活跃</span>
-                <span className="scroll-meta">
-                  {dailyActive.points} 活跃点
-                </span>
-              </div>
-              <div className="progressbar" aria-hidden>
-                <div 
-                  className="progressbar-fill" 
-                  style={{ 
-                    width: `${Math.min(100, (dailyActive.points / 200) * 100)}%`,
-                    background: "var(--accent)"
-                  }} 
-                />
-              </div>
-            </div>
-          </div>
-          {DAILY_ACTIVE_REWARDS.map((reward) => {
-            const isClaimed = dailyActive.claimed[reward.id];
-            const isUnlocked = dailyActive.points >= reward.points;
-            const canClaim = isUnlocked && !isClaimed;
-
-            const handleClaim = () => {
-              if (!canClaim) return;
-              if (soundOn) void playSfx("achievement", 0.8);
-              const result = claimDailyActiveReward(reward.id);
-              if (result.success) {
-                setLastReward(result.reward);
-                setCheckInAnimation(true);
-                setTimeout(() => setCheckInAnimation(false), 2000);
-              }
-            };
-
-            return (
-              <div key={reward.id} className={`task-card ${isClaimed ? "claimed" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  活
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{reward.title}</div>
-                    <div className="task-meta">
-                      {reward.points} 活跃点
-                    </div>
-                  </div>
-                  {reward.description && (
-                    <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                      {reward.description}
-                    </div>
-                  )}
-                </div>
-                <div className="task-side">
-                  <div className="task-reward">
-                    <span className="reward-ico" aria-hidden>
-                      石
-                    </span>
-                    <span className="reward-num">{reward.reward}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={canClaim ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!canClaim}
-                    onClick={handleClaim}
-                  >
-                    {isClaimed ? "已领取" : isUnlocked ? "领取奖励" : "未解锁"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">图鉴收集奖励</div>
-        <div className="scroll-list">
-          {COLLECTION_REWARDS.map((reward) => {
-            const isClaimed = collectionRewardsClaimed[reward.id];
-            const progress = totalCount > 0 ? Math.min(1, ownedCount / totalCount) : 0;
-            const isUnlocked = progress >= reward.threshold;
-
-            return (
-              <div key={reward.id} className={`task-card ${isClaimed ? "claimed" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  藏
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{reward.title}</div>
-                    <div className="task-meta">
-                      {Math.round(reward.threshold * 100)}%
-                    </div>
-                  </div>
-                  <div className="progressbar" aria-hidden>
-                    <div 
-                      className="progressbar-fill" 
-                      style={{ 
-                        width: `${Math.min(1, progress / reward.threshold) * 100}%`,
-                        background: isUnlocked ? "var(--success)" : "var(--accent)"
-                      }} 
-                    />
-                  </div>
-                </div>
-                <div className="task-side">
-                  <div className="task-reward">
-                    <span className="reward-ico" aria-hidden>
-                      石
-                    </span>
-                    <span className="reward-num">{reward.reward}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-paper"
-                    disabled
-                  >
-                    {isClaimed ? "已领取" : isUnlocked ? "已解锁" : "进行中"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">每日任务</div>
-        <div className="scroll-list">
-          {TASK_DEFS.filter((def) => def.type === "daily").map((def) => {
-            const prog = taskProgress[def.id] ?? 0;
-            const claimed = taskClaimedDay === t && taskClaimed[def.id];
-            const done = prog >= def.target;
-            const ratio = Math.min(1, prog / def.target);
-            const status = claimed
-              ? { icon: "✓", label: "已领取", cls: "ok" }
-              : done
-                ? { icon: "★", label: "可领取", cls: "ready" }
-                : { icon: "○", label: "未完成", cls: "todo" };
-
-            const claim = () => {
-              if (!done || claimed) return;
-              if (soundOn) void playSfx("success", 0.7);
-              if (sparkTimerRef.current) window.clearTimeout(sparkTimerRef.current);
-              setSparkTaskId(def.id);
-              sparkTimerRef.current = window.setTimeout(() => setSparkTaskId(null), 650);
-              claimTask(def.id);
-            };
-
-            return (
-              <div key={def.id} className={`task-card ${claimed ? "claimed" : done ? "done" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  令
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{def.title}</div>
-                    <div className="task-meta">
-                      {Math.min(prog, def.target)} / {def.target}
-                    </div>
-                  </div>
-                  <div className="progressbar" aria-hidden>
-                    <div className="progressbar-fill" style={{ width: `${ratio * 100}%` }} />
-                  </div>
-                </div>
-                <div className="task-side">
-                  <div className={`task-reward ${sparkTaskId === def.id ? "spark" : ""}`}>
-                    <span className="reward-ico" aria-hidden>
-                      石
-                    </span>
-                    <span className="reward-num">{def.reward}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={done && !claimed ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!done || claimed}
-                    onClick={claim}
-                  >
-                    <span className={`status-ico ${status.cls} ${sparkTaskId === def.id ? "spark" : ""}`} aria-hidden>
-                      {status.cls === "ok" ? (
-                        <svg className="check-svg" viewBox="0 0 24 24">
-                          <path d="M5 12.5 L10 17.2 L19 7.8" />
-                        </svg>
-                      ) : (
-                        status.icon
-                      )}
-                    </span>
-                    <span>{claimed ? "已领取" : done ? "领取奖励" : "未完成"}</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">周任务</div>
-        <div className="scroll-list">
-          {TASK_DEFS.filter((def) => def.type === "weekly").map((def) => {
-            const prog = weeklyTaskProgress[def.id] ?? 0;
-            const claimed = weeklyTaskClaimedWeek === wk && weeklyTaskClaimed[def.id];
-            const done = prog >= def.target;
-            const ratio = Math.min(1, prog / def.target);
-            const status = claimed
-              ? { icon: "✓", label: "已领取", cls: "ok" }
-              : done
-                ? { icon: "★", label: "可领取", cls: "ready" }
-                : { icon: "○", label: "未完成", cls: "todo" };
-
-            const claim = () => {
-              if (!done || claimed) return;
-              if (soundOn) void playSfx("success", 0.7);
-              if (sparkTimerRef.current) window.clearTimeout(sparkTimerRef.current);
-              setSparkTaskId(def.id);
-              sparkTimerRef.current = window.setTimeout(() => setSparkTaskId(null), 650);
-              claimWeeklyTask(def.id);
-            };
-
-            return (
-              <div key={def.id} className={`task-card ${claimed ? "claimed" : done ? "done" : ""}`}>
-                <div className="task-ico" aria-hidden>
-                  期
-                </div>
-                <div className="task-main">
-                  <div className="task-row1">
-                    <div className="task-title">{def.title}</div>
-                    <div className="task-meta">
-                      {Math.min(prog, def.target)} / {def.target}
-                    </div>
-                  </div>
-                  <div className="progressbar" aria-hidden>
-                    <div className="progressbar-fill" style={{ width: `${ratio * 100}%` }} />
-                  </div>
-                </div>
-                <div className="task-side">
-                  <div className={`task-reward ${sparkTaskId === def.id ? "spark" : ""}`}>
-                    <span className="reward-ico" aria-hidden>
-                      石
-                    </span>
-                    <span className="reward-num">{def.reward}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={done && !claimed ? "btn btn-primary" : "btn btn-paper"}
-                    disabled={!done || claimed}
-                    onClick={claim}
-                  >
-                    <span className={`status-ico ${status.cls} ${sparkTaskId === def.id ? "spark" : ""}`} aria-hidden>
-                      {status.cls === "ok" ? (
-                        <svg className="check-svg" viewBox="0 0 24 24">
-                          <path d="M5 12.5 L10 17.2 L19 7.8" />
-                        </svg>
-                      ) : (
-                        status.icon
-                      )}
-                    </span>
-                    <span>{claimed ? "已领取" : done ? "领取奖励" : "未完成"}</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="scroll-section">
-        <div className="scroll-section-title">成就</div>
-        <div className="scroll-list">
-          {ACHIEVEMENTS.map((a) => {
-            const ok = !!achievements[a.id];
-            return (
-              <div key={a.id} className={`scroll-item ${ok ? "" : "scroll-item-dim"}`}>
-                <div className="scroll-main">
-                  <div className="scroll-row1">
-                    <span className="scroll-name">{a.title}</span>
-                    <span className="scroll-meta" style={{ color: ok ? "var(--accent)" : "var(--muted)" }}>
-                      +{a.points} 点
-                    </span>
-                  </div>
-                  <div className="scroll-row2">{a.description}</div>
-                </div>
-                <div className={`achv-badge ${ok ? "ok" : "muted"}`}>
-                  <span className="status-ico" aria-hidden>
-                    {ok ? (
-                      <svg className="check-svg" viewBox="0 0 24 24">
-                        <path d="M5 12.5 L10 17.2 L19 7.8" />
-                      </svg>
-                    ) : (
-                      "○"
+                  <div>
+                    {checkInAnimation && (
+                      <div style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        background: "var(--success)",
+                        color: "white",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "0.5rem",
+                        fontWeight: 700,
+                        animation: "popIn 0.3s ease-out"
+                      }}>
+                        +{lastReward} 卦石
+                      </div>
                     )}
-                  </span>
-                  <span className="status-text">{ok ? "达成" : "未达成"}</span>
+                    <button
+                      type="button"
+                      className={isCheckedInToday ? "btn btn-paper" : "btn btn-primary"}
+                      disabled={isCheckedInToday}
+                      onClick={handleCheckIn}
+                      data-highlight-target="checkin-button"
+                      aria-label={isCheckedInToday ? "今日已签到" : "点击立即签到领取灵石奖励"}
+                      aria-pressed={isCheckedInToday}
+                    >
+                      {isCheckedInToday ? "已签到" : "立即签到"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            </div>
 
-      <div className="scroll-section">
-        <div className="scroll-section-title">危险操作</div>
-        <div className="scroll-list">
-          <div className="scroll-item">
-            <div className="scroll-main">
-              <div className="scroll-row1">
-                <span className="scroll-name">重置存档</span>
-                <span className="scroll-meta">清空本地 LocalStorage</span>
-              </div>
-              <div className="scroll-actions">
-                <button type="button" className="btn btn-paper" onClick={resetAll}>
-                  清空本地存档并重置游戏
-                </button>
+            <div className="scroll-section">
+              <div className="scroll-section-title">每日任务</div>
+              <div className="scroll-list">
+                {TASK_DEFS.filter((def) => def.type === "daily").map((def) => {
+                  const prog = taskProgress[def.id] ?? 0;
+                  const claimed = taskClaimedDay === t && taskClaimed[def.id];
+                  const done = prog >= def.target;
+                  const ratio = Math.min(1, prog / def.target);
+                  const status = claimed
+                    ? { icon: "✓", label: "已领取", cls: "ok" }
+                    : done
+                      ? { icon: "★", label: "可领取", cls: "ready" }
+                      : { icon: "○", label: "未完成", cls: "todo" };
+
+                  const claim = () => {
+                    if (!done || claimed) return;
+                    if (soundOn) void playSfx("success", 0.7);
+                    if (sparkTimerRef.current) window.clearTimeout(sparkTimerRef.current);
+                    setSparkTaskId(def.id);
+                    sparkTimerRef.current = window.setTimeout(() => setSparkTaskId(null), 650);
+                    claimTask(def.id);
+                  };
+
+                  return (
+                    <div key={def.id} className={`task-card ${claimed ? "claimed" : done ? "done" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        令
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{def.title}</div>
+                          <div className="task-meta">
+                            {Math.min(prog, def.target)} / {def.target}
+                          </div>
+                        </div>
+                        <div className="progressbar" aria-hidden>
+                          <div className="progressbar-fill" style={{ width: `${ratio * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="task-side">
+                        <div className={`task-reward ${sparkTaskId === def.id ? "spark" : ""}`}>
+                          <span className="reward-ico" aria-hidden>
+                            石
+                          </span>
+                          <span className="reward-num">{def.reward}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={done && !claimed ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!done || claimed}
+                          onClick={claim}
+                        >
+                          <span className={`status-ico ${status.cls} ${sparkTaskId === def.id ? "spark" : ""}`} aria-hidden>
+                            {status.cls === "ok" ? (
+                              <svg className="check-svg" viewBox="0 0 24 24">
+                                <path d="M5 12.5 L10 17.2 L19 7.8" />
+                              </svg>
+                            ) : (
+                              status.icon
+                            )}
+                          </span>
+                          <span>{claimed ? "已领取" : done ? "领取奖励" : "未完成"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="seal-tag seal-danger">慎</div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">每日活跃奖励</div>
+              <div className="scroll-list">
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">今日活跃</span>
+                      <span className="scroll-meta">
+                        {dailyActive.points} 活跃点
+                      </span>
+                    </div>
+                    <div className="progressbar" aria-hidden>
+                      <div 
+                        className="progressbar-fill" 
+                        style={{ 
+                          width: `${Math.min(100, (dailyActive.points / 200) * 100)}%`,
+                          background: "var(--accent)"
+                        }} 
+                      />
+                    </div>
+                  </div>
+                </div>
+                {DAILY_ACTIVE_REWARDS.map((reward) => {
+                  const isClaimed = dailyActive.claimed[reward.id];
+                  const isUnlocked = dailyActive.points >= reward.points;
+                  const canClaim = isUnlocked && !isClaimed;
+
+                  const handleClaim = () => {
+                    if (!canClaim) return;
+                    if (soundOn) void playSfx("achievement", 0.8);
+                    const result = claimDailyActiveReward(reward.id);
+                    if (result.success) {
+                      setLastReward(result.reward);
+                      setCheckInAnimation(true);
+                      setTimeout(() => setCheckInAnimation(false), 2000);
+                    }
+                  };
+
+                  return (
+                    <div key={reward.id} className={`task-card ${isClaimed ? "claimed" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        活
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{reward.title}</div>
+                          <div className="task-meta">
+                            {reward.points} 活跃点
+                          </div>
+                        </div>
+                        {reward.description && (
+                          <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                            {reward.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="task-side">
+                        <div className="task-reward">
+                          <span className="reward-ico" aria-hidden>
+                            石
+                          </span>
+                          <span className="reward-num">{reward.reward}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={canClaim ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!canClaim}
+                          onClick={handleClaim}
+                        >
+                          {isClaimed ? "已领取" : isUnlocked ? "领取奖励" : "未解锁"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">每日特权</div>
+              <div className="scroll-list">
+                {DAILY_PRIVILEGES.map((priv) => {
+                  const isUnlocked = achievementLevel() >= priv.requiredLevel;
+                  const usage = dailyPrivilegeUsage;
+                  const isUsed = usage.date === t && usage.used[priv.id];
+
+                  const handleUse = () => {
+                    if (!isUnlocked || isUsed) return;
+                    if (soundOn) void playSfx("success", 0.7);
+                    const result = useDailyPrivilege(priv.id);
+                    if (result.success && (priv.id === "priv_free_pull" || priv.id === "priv_extra_coins")) {
+                      setLastReward(priv.id === "priv_extra_coins" ? 50 : 1);
+                      setCheckInAnimation(true);
+                      setTimeout(() => setCheckInAnimation(false), 2000);
+                    }
+                  };
+
+                  return (
+                    <div key={priv.id} className={`task-card ${isUsed ? "claimed" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        权
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{priv.title}</div>
+                          <div className="task-meta">
+                            Lv.{priv.requiredLevel}
+                          </div>
+                        </div>
+                        <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                          {priv.description}
+                        </div>
+                      </div>
+                      <div className="task-side">
+                        <button
+                          type="button"
+                          className={isUnlocked && !isUsed ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!isUnlocked || isUsed}
+                          onClick={handleUse}
+                        >
+                          {isUsed ? "今日已用" : isUnlocked ? "立即使用" : "未解锁"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* 每周标签页 */}
+        {activeTab === 'weekly' && (
+          <div className="weekly-section">
+            <div className="scroll-section">
+              <div className="scroll-section-title">周任务</div>
+              <div className="scroll-list">
+                {TASK_DEFS.filter((def) => def.type === "weekly").map((def) => {
+                  const prog = weeklyTaskProgress[def.id] ?? 0;
+                  const claimed = weeklyTaskClaimedWeek === wk && weeklyTaskClaimed[def.id];
+                  const done = prog >= def.target;
+                  const ratio = Math.min(1, prog / def.target);
+                  const status = claimed
+                    ? { icon: "✓", label: "已领取", cls: "ok" }
+                    : done
+                      ? { icon: "★", label: "可领取", cls: "ready" }
+                      : { icon: "○", label: "未完成", cls: "todo" };
+
+                  const claim = () => {
+                    if (!done || claimed) return;
+                    if (soundOn) void playSfx("success", 0.7);
+                    if (sparkTimerRef.current) window.clearTimeout(sparkTimerRef.current);
+                    setSparkTaskId(def.id);
+                    sparkTimerRef.current = window.setTimeout(() => setSparkTaskId(null), 650);
+                    claimWeeklyTask(def.id);
+                  };
+
+                  return (
+                    <div key={def.id} className={`task-card ${claimed ? "claimed" : done ? "done" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        期
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{def.title}</div>
+                          <div className="task-meta">
+                            {Math.min(prog, def.target)} / {def.target}
+                          </div>
+                        </div>
+                        <div className="progressbar" aria-hidden>
+                          <div className="progressbar-fill" style={{ width: `${ratio * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="task-side">
+                        <div className={`task-reward ${sparkTaskId === def.id ? "spark" : ""}`}>
+                          <span className="reward-ico" aria-hidden>
+                            石
+                          </span>
+                          <span className="reward-num">{def.reward}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={done && !claimed ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!done || claimed}
+                          onClick={claim}
+                        >
+                          <span className={`status-ico ${status.cls} ${sparkTaskId === def.id ? "spark" : ""}`} aria-hidden>
+                            {status.cls === "ok" ? (
+                              <svg className="check-svg" viewBox="0 0 24 24">
+                                <path d="M5 12.5 L10 17.2 L19 7.8" />
+                              </svg>
+                            ) : (
+                              status.icon
+                            )}
+                          </span>
+                          <span>{claimed ? "已领取" : done ? "领取奖励" : "未完成"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 成就标签页 */}
+        {activeTab === 'achievements' && (
+          <div className="achievements-section">
+            <div className="scroll-section">
+              <div className="scroll-section-title">成就等级</div>
+              <div className="scroll-list">
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">成就等级 {achievementLevel()}</span>
+                      <span className="scroll-meta">
+                        {achievementPoints()} 点成就点数
+                      </span>
+                    </div>
+                    <div className="scroll-row2">
+                      收集更多卡牌、完成每日任务来提升成就等级
+                    </div>
+                  </div>
+                  <div className="achv-badge ok">
+                    <span className="status-text">Lv.{achievementLevel()}</span>
+                  </div>
+                </div>
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">图鉴收集</span>
+                      <span className="scroll-meta">
+                        {ownedCount} / {totalCount} · {collectionProgress}%
+                      </span>
+                    </div>
+                    <div className="progressbar" style={{ marginTop: "0.5rem" }} aria-hidden>
+                      <div className="progressbar-fill" style={{ width: `${collectionProgress}%` }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">游戏统计</span>
+                    </div>
+                    <div className="scroll-row2" style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: "0.5rem",
+                      marginTop: "0.5rem"
+                    }}>
+                      <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>总抽卡</div>
+                        <div style={{ fontWeight: 700 }}>{stats.totalPulls}</div>
+                      </div>
+                      <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>SSR 获得</div>
+                        <div style={{ fontWeight: 700, color: "var(--accent)" }}>{stats.totalSsr}</div>
+                      </div>
+                      <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>SR 获得</div>
+                        <div style={{ fontWeight: 700, color: "#ff9f43" }}>{stats.totalSr}</div>
+                      </div>
+                      <div style={{ background: "var(--bg-2)", padding: "0.5rem", borderRadius: "0.35rem" }}>
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>任务完成</div>
+                        <div style={{ fontWeight: 700 }}>{stats.taskCompletedCount}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">成就</div>
+              <div className="scroll-list">
+                {ACHIEVEMENTS.map((a) => {
+                  const ok = !!achievements[a.id];
+                  return (
+                    <div key={a.id} className={`scroll-item ${ok ? "" : "scroll-item-dim"}`}>
+                      <div className="scroll-main">
+                        <div className="scroll-row1">
+                          <span className="scroll-name">{a.title}</span>
+                          <span className="scroll-meta" style={{ color: ok ? "var(--accent)" : "var(--muted)" }}>
+                            +{a.points} 点
+                          </span>
+                        </div>
+                        <div className="scroll-row2">{a.description}</div>
+                      </div>
+                      <div className={`achv-badge ${ok ? "ok" : "muted"}`}>
+                        <span className="status-ico" aria-hidden>
+                          {ok ? (
+                            <svg className="check-svg" viewBox="0 0 24 24">
+                              <path d="M5 12.5 L10 17.2 L19 7.8" />
+                            </svg>
+                          ) : (
+                            "○"
+                          )}
+                        </span>
+                        <span className="status-text">{ok ? "达成" : "未达成"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 商店标签页 */}
+        {activeTab === 'shop' && (
+          <div className="shop-section">
+            <div className="scroll-section">
+              <div className="scroll-section-title">成就商店</div>
+              <div className="scroll-list">
+                {ACHIEVEMENT_SHOP_ITEMS.map((item) => {
+                  const canAfford = achievementPoints() >= item.cost;
+                  const purchased = achievementShopPurchased[item.id] || 0;
+
+                  const handlePurchase = () => {
+                    if (!canAfford) return;
+                    if (soundOn) void playSfx("reward", 0.7);
+                    const result = purchaseFromAchievementShop(item.id);
+                    if (result.success) {
+                      setLastReward(item.value);
+                      setCheckInAnimation(true);
+                      setTimeout(() => setCheckInAnimation(false), 2000);
+                    }
+                  };
+
+                  return (
+                    <div key={item.id} className="task-card">
+                      <div className="task-ico" aria-hidden>
+                        商
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{item.title}</div>
+                          <div className="task-meta">
+                            {purchased} 次兑换
+                          </div>
+                        </div>
+                        <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                          {item.description}
+                        </div>
+                      </div>
+                      <div className="task-side">
+                        <div className="task-reward">
+                          <span className="reward-ico" aria-hidden>
+                            点
+                          </span>
+                          <span className="reward-num">{item.cost}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={canAfford ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!canAfford}
+                          onClick={handlePurchase}
+                        >
+                          兑换
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">成就等级奖励</div>
+              <div className="scroll-list">
+                {ACHIEVEMENT_LEVEL_REWARDS.map((reward) => {
+                  const isClaimed = achievementLevelRewardsClaimed[reward.level];
+                  const isUnlocked = achievementLevel() >= reward.level;
+                  const canClaim = isUnlocked && !isClaimed;
+
+                  const handleClaim = () => {
+                    if (!canClaim) return;
+                    if (soundOn) void playSfx("achievement", 0.8);
+                    claimAchievementLevelReward(reward.level);
+                  };
+
+                  return (
+                    <div key={reward.level} className={`task-card ${isClaimed ? "claimed" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        级
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{reward.title}</div>
+                          <div className="task-meta">
+                            Lv.{reward.level}
+                          </div>
+                        </div>
+                        {reward.description && (
+                          <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                            {reward.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="task-side">
+                        <div className="task-reward">
+                          <span className="reward-ico" aria-hidden>
+                            石
+                          </span>
+                          <span className="reward-num">{reward.reward}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={canClaim ? "btn btn-primary" : "btn btn-paper"}
+                          disabled={!canClaim}
+                          onClick={handleClaim}
+                        >
+                          {isClaimed ? "已领取" : isUnlocked ? "领取奖励" : "未解锁"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">图鉴收集奖励</div>
+              <div className="scroll-list">
+                {COLLECTION_REWARDS.map((reward) => {
+                  const isClaimed = collectionRewardsClaimed[reward.id];
+                  const progress = totalCount > 0 ? Math.min(1, ownedCount / totalCount) : 0;
+                  const isUnlocked = progress >= reward.threshold;
+
+                  return (
+                    <div key={reward.id} className={`task-card ${isClaimed ? "claimed" : ""}`}>
+                      <div className="task-ico" aria-hidden>
+                        藏
+                      </div>
+                      <div className="task-main">
+                        <div className="task-row1">
+                          <div className="task-title">{reward.title}</div>
+                          <div className="task-meta">
+                            {Math.round(reward.threshold * 100)}%
+                          </div>
+                        </div>
+                        <div className="progressbar" aria-hidden>
+                          <div 
+                            className="progressbar-fill" 
+                            style={{ 
+                              width: `${Math.min(1, progress / reward.threshold) * 100}%`,
+                              background: isUnlocked ? "var(--success)" : "var(--accent)"
+                            }} 
+                          />
+                        </div>
+                      </div>
+                      <div className="task-side">
+                        <div className="task-reward">
+                          <span className="reward-ico" aria-hidden>
+                            石
+                          </span>
+                          <span className="reward-num">{reward.reward}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-paper"
+                          disabled
+                        >
+                          {isClaimed ? "已领取" : isUnlocked ? "已解锁" : "进行中"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">数据统计</div>
+              <StatsDashboard />
+            </div>
+
+            <div className="scroll-section">
+              <div className="scroll-section-title">危险操作</div>
+              <div className="scroll-list">
+                <div className="scroll-item">
+                  <div className="scroll-main">
+                    <div className="scroll-row1">
+                      <span className="scroll-name">重置存档</span>
+                      <span className="scroll-meta">清空本地 LocalStorage</span>
+                    </div>
+                    <div className="scroll-actions">
+                      <button type="button" className="btn btn-paper" onClick={resetAll}>
+                        清空本地存档并重置游戏
+                      </button>
+                    </div>
+                  </div>
+                  <div className="seal-tag seal-danger">慎</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2591,6 +2732,7 @@ function CollectionTab() {
   const removeCardFromDeck = useGameStore((s) => s.removeCardFromDeck);
   const setActiveDeck = useGameStore((s) => s.setActiveDeck);
   const getDeckCardSkills = useGameStore((s) => s.getDeckCardSkills);
+  const soundOn = useGameStore((s) => s.settings.soundOn);
   
   const [rarity, setRarity] = useState<"ALL" | "SSR" | "SR" | "R" | "N">("ALL");
   const [ownedOnly, setOwnedOnly] = useState(false);
@@ -2601,6 +2743,8 @@ function CollectionTab() {
   const [newDeckName, setNewDeckName] = useState("");
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [showDeckManager, setShowDeckManager] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
   
   const rarityD = useDeferredValue(rarity);
   const ownedOnlyD = useDeferredValue(ownedOnly);
@@ -2616,6 +2760,48 @@ function CollectionTab() {
     setMissingOnly(false);
     setSortBy("rarity");
     setSearch("");
+  };
+
+  const handleToggleSelectCard = (cardId: string) => {
+    setSelectedCards(prev => 
+      prev.includes(cardId) 
+        ? prev.filter(id => id !== cardId)
+        : [...prev, cardId]
+    );
+    if (soundOn) void playSfx("click", 0.5);
+  };
+
+  const handleSelectAll = () => {
+    const ownedCardIds = list.filter(c => (inventory[c.id] ?? 0) > 0).map(c => c.id);
+    setSelectedCards(ownedCardIds);
+    if (soundOn) void playSfx("success", 0.6);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCards([]);
+    if (soundOn) void playSfx("click", 0.4);
+  };
+
+  const handleExitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedCards([]);
+    if (soundOn) void playSfx("click", 0.5);
+  };
+
+  const handleBatchAddToDeck = () => {
+    if (!selectedDeckId) {
+      alert("请先选择一个卡组！");
+      return;
+    }
+    let added = 0;
+    for (const cardId of selectedCards) {
+      const result = addCardToDeck(selectedDeckId, cardId);
+      if (result.success) added++;
+    }
+    alert(`成功添加 ${added} 张卡牌到卡组！`);
+    setSelectedCards([]);
+    setSelectMode(false);
+    if (soundOn) void playSfx("success", 0.7);
   };
 
   const handleCreateDeck = () => {
@@ -2907,72 +3093,139 @@ function CollectionTab() {
       </div>
 
       <div className="treasure-toolbar">
-        <div style={{ marginBottom: "0.65rem" }}>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索卡牌名称、关键词或元素…"
-            className="search-input"
-          />
-        </div>
-        <div className="segmented" role="tablist" aria-label="稀有度筛选">
-          {(["ALL", "SSR", "SR", "R", "N"] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              className={`seg-btn ${rarity === r ? "active" : ""}`}
-              onClick={() => setRarity(r)}
-              role="tab"
-              aria-selected={rarity === r}
-            >
-              {r === "ALL" ? "全部" : r}
-            </button>
-          ))}
-        </div>
-        <div className="btn-row" style={{ gap: "0.45rem" }}>
-          <button
-            type="button"
-            className={sortBy === "rarity" ? "btn btn-primary" : "btn btn-paper"}
-            onClick={() => setSortBy("rarity")}
-          >
-            按稀有度
-          </button>
-          <button
-            type="button"
-            className={sortBy === "name" ? "btn btn-primary" : "btn btn-paper"}
-            onClick={() => setSortBy("name")}
-          >
-            按名称
-          </button>
-          <button
-            type="button"
-            className={ownedOnly ? "btn btn-primary" : "btn btn-paper"}
-            onClick={() => {
-              setOwnedOnly(!ownedOnly);
-              if (!ownedOnly) setMissingOnly(false);
-            }}
-          >
-            只看已拥有
-          </button>
-          <button
-            type="button"
-            className={missingOnly ? "btn btn-primary" : "btn btn-paper"}
-            onClick={() => {
-              setMissingOnly(!missingOnly);
-              if (!missingOnly) setOwnedOnly(false);
-            }}
-          >
-            只看未获得
-          </button>
-          <button
-            type="button"
-            className="btn btn-paper"
-            onClick={resetFilters}
-          >
-            重置
-          </button>
-        </div>
+        {selectMode ? (
+          <div style={{ 
+            padding: "0.8rem", 
+            background: "linear-gradient(135deg, rgba(147,112,219,0.15), rgba(9,10,14,0.3))", 
+            borderRadius: "0.6rem", 
+            border: "1px solid rgba(147,112,219,0.35)",
+            marginBottom: "1rem"
+          }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center", 
+              marginBottom: "0.6rem" 
+            }}>
+              <div style={{ fontWeight: 700, color: "var(--text)" }}>
+                批量操作 <span style={{ color: "var(--accent)" }}>({selectedCards.length})</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-paper"
+                onClick={handleExitSelectMode}
+              >
+                退出
+              </button>
+            </div>
+            <div className="btn-row" style={{ gap: "0.45rem" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSelectAll}
+              >
+                全选已拥有
+              </button>
+              <button
+                type="button"
+                className="btn btn-paper"
+                onClick={handleClearSelection}
+                disabled={selectedCards.length === 0}
+              >
+                取消选择
+              </button>
+              {selectedCards.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleBatchAddToDeck}
+                  disabled={!selectedDeckId}
+                >
+                  {selectedDeckId ? `添加到「${decks[selectedDeckId]?.name}」` : "请先选择卡组"}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: "0.65rem" }}>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索卡牌名称、关键词或元素…"
+              className="search-input"
+            />
+          </div>
+        )}
+        
+        {!selectMode && (
+          <>
+            <div className="segmented" role="tablist" aria-label="稀有度筛选">
+              {(["ALL", "SSR", "SR", "R", "N"] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`seg-btn ${rarity === r ? "active" : ""}`}
+                  onClick={() => setRarity(r)}
+                  role="tab"
+                  aria-selected={rarity === r}
+                >
+                  {r === "ALL" ? "全部" : r}
+                </button>
+              ))}
+            </div>
+            <div className="btn-row" style={{ gap: "0.45rem" }}>
+              <button
+                type="button"
+                className={sortBy === "rarity" ? "btn btn-primary" : "btn btn-paper"}
+                onClick={() => setSortBy("rarity")}
+              >
+                按稀有度
+              </button>
+              <button
+                type="button"
+                className={sortBy === "name" ? "btn btn-primary" : "btn btn-paper"}
+                onClick={() => setSortBy("name")}
+              >
+                按名称
+              </button>
+              <button
+                type="button"
+                className={ownedOnly ? "btn btn-primary" : "btn btn-paper"}
+                onClick={() => {
+                  setOwnedOnly(!ownedOnly);
+                  if (!ownedOnly) setMissingOnly(false);
+                }}
+              >
+                只看已拥有
+              </button>
+              <button
+                type="button"
+                className={missingOnly ? "btn btn-primary" : "btn btn-paper"}
+                onClick={() => {
+                  setMissingOnly(!missingOnly);
+                  if (!missingOnly) setOwnedOnly(false);
+                }}
+              >
+                只看未获得
+              </button>
+              <button
+                type="button"
+                className="btn btn-paper"
+                onClick={resetFilters}
+              >
+                重置
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setSelectMode(true)}
+              >
+                批量操作
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <PortraitWorkshop cards={CARDS} />
@@ -2983,21 +3236,56 @@ function CollectionTab() {
           const hasPortrait = !!portraitUrlForId(c.id);
           const isInDeck = selectedDeckId && decks[selectedDeckId]?.cardIds.includes(c.id);
           const canAddToDeck = selectedDeckId && n > 0;
+          const isSelected = selectedCards.includes(c.id);
           return (
             <div
               key={c.id}
-              className={`treasure-card ${n > 0 ? "owned" : "locked"} ${hasPortrait ? "has-portrait" : ""} ${rarityTierClass(c.rarity)}`}
+              className={`treasure-card ${n > 0 ? "owned" : "locked"} ${hasPortrait ? "has-portrait" : ""} ${rarityTierClass(c.rarity)} ${isSelected ? "selected" : ""}`}
               style={{ 
-                outline: isInDeck ? "3px solid #667eea" : "none",
-                outlineOffset: "-3px"
+                outline: isSelected ? "4px solid #667eea" : isInDeck ? "3px solid #667eea" : "none",
+                outlineOffset: isSelected ? "-4px" : "-3px",
+                cursor: selectMode ? "pointer" : "default"
+              }}
+              onClick={() => {
+                if (selectMode && n > 0) {
+                  handleToggleSelectCard(c.id);
+                }
               }}
             >
+              {selectMode && n > 0 && (
+                <div style={{
+                  position: "absolute",
+                  top: "0.5rem",
+                  left: "0.5rem",
+                  width: "1.5rem",
+                  height: "1.5rem",
+                  borderRadius: "50%",
+                  background: isSelected ? "#667eea" : "rgba(0,0,0,0.5)",
+                  border: "2px solid white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
+                }}>
+                  {isSelected && (
+                    <svg viewBox="0 0 24 24" style={{ width: "1rem", height: "1rem", color: "white" }}>
+                      <path d="M5 12.5 L10 17.2 L19 7.8" stroke="currentColor" strokeWidth="3" fill="none" />
+                    </svg>
+                  )}
+                </div>
+              )}
               <div className="treasure-art" style={{ backgroundImage: `url("${getArt(c)}")` }} />
               <div className="treasure-top">
                 <button
                   type="button"
                   className={`treasure-rarity ${rarityClass(c.rarity)}`}
-                  onClick={() => setSelectedCard(c)}
+                  onClick={(e) => {
+                    if (!selectMode) {
+                      e.stopPropagation();
+                      setSelectedCard(c);
+                    }
+                  }}
                   aria-label={`查看${c.name}详情`}
                 >
                   {c.rarity}
@@ -3013,7 +3301,7 @@ function CollectionTab() {
                     </span>
                   ))}
                 </div>
-                {canAddToDeck && (
+                {!selectMode && canAddToDeck && (
                   <button
                     type="button"
                     style={{

@@ -632,7 +632,7 @@ export function cardFrontUrl(input: {
   return svgDataUrl(svg);
 }
 
-type SfxName = "tap" | "seal" | "flip" | "ssr" | "success" | "click" | "reward" | "warning" | "achievement";
+type SfxName = "tap" | "seal" | "flip" | "ssr" | "success" | "click" | "reward" | "warning" | "achievement" | "card" | "levelup" | "purchase" | "complete" | "error" | "navigate" | "dropdown" | "popup" | "shine" | "draw" | "collect" | "equip" | "unequip" | "trade" | "gift" | "daily" | "weekly" | "checkin";
 
 let ctx: AudioContext | null = null;
 
@@ -770,6 +770,213 @@ export async function playSfx(name: SfxName, volume = 0.7): Promise<void> {
     env(g, t0, 0.008, 0.12, 0.35, 0.35, 0.95);
     o.start(t0);
     o.stop(t0 + 0.55);
+    return;
+  }
+
+  if (name === "card") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(330, t0);
+    o.frequency.exponentialRampToValueAtTime(660, t0 + 0.08);
+    f.frequency.setValueAtTime(1600, t0);
+    env(g, t0, 0.003, 0.04, 0.08, 0.08, 0.7);
+    o.start(t0);
+    o.stop(t0 + 0.15);
+    return;
+  }
+
+  if (name === "levelup") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(440, t0);
+    o.frequency.setValueAtTime(550, t0 + 0.08);
+    o.frequency.setValueAtTime(660, t0 + 0.16);
+    o.frequency.setValueAtTime(880, t0 + 0.24);
+    f.frequency.setValueAtTime(2400, t0);
+    env(g, t0, 0.006, 0.1, 0.3, 0.3, 0.85);
+    o.start(t0);
+    o.stop(t0 + 0.45);
+    return;
+  }
+
+  if (name === "purchase") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.setValueAtTime(660, t0 + 0.06);
+    o.frequency.setValueAtTime(780, t0 + 0.12);
+    f.frequency.setValueAtTime(2000, t0);
+    env(g, t0, 0.004, 0.06, 0.2, 0.25, 0.8);
+    o.start(t0);
+    o.stop(t0 + 0.35);
+    return;
+  }
+
+  if (name === "complete") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(392, t0);
+    o.frequency.setValueAtTime(494, t0 + 0.1);
+    o.frequency.setValueAtTime(587, t0 + 0.2);
+    f.frequency.setValueAtTime(1800, t0);
+    env(g, t0, 0.005, 0.08, 0.25, 0.3, 0.8);
+    o.start(t0);
+    o.stop(t0 + 0.4);
+    return;
+  }
+
+  if (name === "error") {
+    o.type = "square";
+    o.frequency.setValueAtTime(180, t0);
+    o.frequency.setValueAtTime(140, t0 + 0.1);
+    f.frequency.setValueAtTime(600, t0);
+    env(g, t0, 0.01, 0.06, 0.1, 0.15, 0.6);
+    o.start(t0);
+    o.stop(t0 + 0.25);
+    return;
+  }
+
+  if (name === "navigate") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(480, t0);
+    o.frequency.exponentialRampToValueAtTime(640, t0 + 0.05);
+    f.frequency.setValueAtTime(1800, t0);
+    env(g, t0, 0.002, 0.02, 0.06, 0.06, 0.5);
+    o.start(t0);
+    o.stop(t0 + 0.1);
+    return;
+  }
+
+  if (name === "dropdown") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(320, t0);
+    o.frequency.exponentialRampToValueAtTime(240, t0 + 0.06);
+    f.frequency.setValueAtTime(1200, t0);
+    env(g, t0, 0.002, 0.03, 0.08, 0.08, 0.55);
+    o.start(t0);
+    o.stop(t0 + 0.12);
+    return;
+  }
+
+  if (name === "popup") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(440, t0);
+    o.frequency.setValueAtTime(550, t0 + 0.05);
+    f.frequency.setValueAtTime(2000, t0);
+    env(g, t0, 0.004, 0.05, 0.15, 0.15, 0.65);
+    o.start(t0);
+    o.stop(t0 + 0.25);
+    return;
+  }
+
+  if (name === "shine") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(880, t0);
+    o.frequency.setValueAtTime(1100, t0 + 0.08);
+    o.frequency.setValueAtTime(1320, t0 + 0.16);
+    f.frequency.setValueAtTime(3200, t0);
+    env(g, t0, 0.005, 0.08, 0.2, 0.25, 0.75);
+    o.start(t0);
+    o.stop(t0 + 0.4);
+    return;
+  }
+
+  if (name === "draw") {
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(220, t0);
+    o.frequency.exponentialRampToValueAtTime(440, t0 + 0.12);
+    f.frequency.setValueAtTime(1400, t0);
+    env(g, t0, 0.006, 0.1, 0.15, 0.2, 0.75);
+    o.start(t0);
+    o.stop(t0 + 0.3);
+    return;
+  }
+
+  if (name === "collect") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.setValueAtTime(660, t0 + 0.05);
+    o.frequency.setValueAtTime(780, t0 + 0.1);
+    f.frequency.setValueAtTime(2200, t0);
+    env(g, t0, 0.004, 0.06, 0.2, 0.2, 0.78);
+    o.start(t0);
+    o.stop(t0 + 0.32);
+    return;
+  }
+
+  if (name === "equip") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(392, t0);
+    o.frequency.setValueAtTime(523, t0 + 0.06);
+    f.frequency.setValueAtTime(1600, t0);
+    env(g, t0, 0.003, 0.05, 0.12, 0.15, 0.68);
+    o.start(t0);
+    o.stop(t0 + 0.22);
+    return;
+  }
+
+  if (name === "unequip") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(523, t0);
+    o.frequency.setValueAtTime(392, t0 + 0.06);
+    f.frequency.setValueAtTime(1400, t0);
+    env(g, t0, 0.003, 0.05, 0.12, 0.15, 0.6);
+    o.start(t0);
+    o.stop(t0 + 0.2);
+    return;
+  }
+
+  if (name === "trade") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(440, t0);
+    o.frequency.setValueAtTime(550, t0 + 0.08);
+    f.frequency.setValueAtTime(1800, t0);
+    env(g, t0, 0.004, 0.06, 0.18, 0.2, 0.72);
+    o.start(t0);
+    o.stop(t0 + 0.3);
+    return;
+  }
+
+  if (name === "gift") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.setValueAtTime(660, t0 + 0.06);
+    o.frequency.setValueAtTime(780, t0 + 0.12);
+    f.frequency.setValueAtTime(2000, t0);
+    env(g, t0, 0.005, 0.08, 0.25, 0.28, 0.82);
+    o.start(t0);
+    o.stop(t0 + 0.4);
+    return;
+  }
+
+  if (name === "daily") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(440, t0);
+    o.frequency.setValueAtTime(550, t0 + 0.1);
+    f.frequency.setValueAtTime(1600, t0);
+    env(g, t0, 0.005, 0.08, 0.2, 0.25, 0.7);
+    o.start(t0);
+    o.stop(t0 + 0.35);
+    return;
+  }
+
+  if (name === "weekly") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(392, t0);
+    o.frequency.setValueAtTime(494, t0 + 0.12);
+    o.frequency.setValueAtTime(587, t0 + 0.24);
+    f.frequency.setValueAtTime(1800, t0);
+    env(g, t0, 0.006, 0.1, 0.3, 0.3, 0.75);
+    o.start(t0);
+    o.stop(t0 + 0.45);
+    return;
+  }
+
+  if (name === "checkin") {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.setValueAtTime(660, t0 + 0.08);
+    o.frequency.setValueAtTime(780, t0 + 0.16);
+    f.frequency.setValueAtTime(2200, t0);
+    env(g, t0, 0.005, 0.08, 0.25, 0.3, 0.85);
+    o.start(t0);
+    o.stop(t0 + 0.45);
     return;
   }
 

@@ -233,6 +233,16 @@ interface GameState {
   /** 新手引导 */
   tutorialStep: number;
   tutorialCompleted: boolean;
+  /** 智能提示系统 */
+  smartTips: {
+    hasSeenCollectionTip: boolean;
+    hasSeenDeckTip: boolean;
+    hasSeenBreakthroughTip: boolean;
+    lastTipShown: string | null;
+  };
+  /** 加载状态 */
+  isLoading: boolean;
+  loadingMessage: string;
   /** 云存档相关 */
   cloudSaveEnabled: boolean;
   cloudLastSavedAt: string | null;
@@ -257,6 +267,14 @@ interface GameState {
     type: "coins" | "card" | "achievement" | "level";
     amount: number;
   } | null;
+  
+  /** 成就通知状态 */
+  achievementNotification: {
+    visible: boolean;
+    title: string;
+    message: string;
+    icon: string;
+  };
 
   /** actions */
   resetAll: () => void;
@@ -303,6 +321,10 @@ interface GameState {
   getSetBonuses: () => Array<{ setName: string; bonus: string; effect: string; value: number }>;
   triggerRewardAnimation: (type: "coins" | "card" | "achievement" | "level", amount: number) => void;
   dismissRewardAnimation: () => void;
+  triggerAchievementNotification: (title: string, message: string, icon: string) => void;
+  dismissAchievementNotification: () => void;
+  showSmartTip: (tipType: "collection" | "deck" | "breakthrough") => boolean;
+  setLoading: (isLoading: boolean, message?: string) => void;
 }
 
 function initialState(): Omit<
@@ -351,6 +373,10 @@ function initialState(): Omit<
   | "getSetBonuses"
   | "triggerRewardAnimation"
   | "dismissRewardAnimation"
+  | "triggerAchievementNotification"
+  | "dismissAchievementNotification"
+  | "showSmartTip"
+  | "setLoading"
 > {
   return {
     saveVersion: SAVE_VERSION,
@@ -409,6 +435,14 @@ function initialState(): Omit<
     totalCheckIns: 0,
     tutorialStep: 0,
     tutorialCompleted: false,
+    smartTips: {
+      hasSeenCollectionTip: false,
+      hasSeenDeckTip: false,
+      hasSeenBreakthroughTip: false,
+      lastTipShown: null,
+    },
+    isLoading: false,
+    loadingMessage: "",
     cloudSaveEnabled: false,
     cloudLastSavedAt: null,
     cloudLastSyncedAt: null,
@@ -424,6 +458,12 @@ function initialState(): Omit<
     cardLevels: {},
     cardBreakthroughs: {},
     rewardAnimation: null,
+    achievementNotification: {
+      visible: false,
+      title: "",
+      message: "",
+      icon: "",
+    },
   };
 }
 
@@ -754,6 +794,8 @@ export const useGameStore = create<GameState>()(
           }
 
           const ach = { ...st.achievements };
+          const oldAchievements = { ...st.achievements };
+          
           ach.a_first = true;
           if (pr.rarity === "SSR") ach.a_ssr = true;
           if (st.totalPulls + 1 >= 10) ach.a_10 = true;
@@ -790,6 +832,16 @@ export const useGameStore = create<GameState>()(
           const ownedCount = Object.keys(inv).filter((id) => (inv[id] ?? 0) > 0).length;
           if (ownedCount >= CARDS.length / 2) ach.a_collection_half = true;
           if (ownedCount >= CARDS.length) ach.a_collection_full = true;
+
+          // 检查新解锁的成就
+          const newlyUnlocked = ACHIEVEMENTS.filter(a => ach[a.id] && !oldAchievements[a.id]);
+          for (const achievement of newlyUnlocked) {
+            get().triggerAchievementNotification(
+              achievement.title,
+              achievement.description,
+              "🏆"
+            );
+          }
 
           const progress = CARDS.length > 0 ? ownedCount / CARDS.length : 0;
           const newClaimed = { ...st.collectionRewardsClaimed };
@@ -917,6 +969,7 @@ export const useGameStore = create<GameState>()(
           const inv = { ...st.inventory };
           const stats = { ...st.stats };
           const ach = { ...st.achievements };
+          const oldAchievements = { ...st.achievements };
 
           let ssrCount = 0;
           let srCount = 0;
@@ -981,6 +1034,16 @@ export const useGameStore = create<GameState>()(
           const ownedCount = Object.keys(inv).filter((id) => (inv[id] ?? 0) > 0).length;
           if (ownedCount >= CARDS.length / 2) ach.a_collection_half = true;
           if (ownedCount >= CARDS.length) ach.a_collection_full = true;
+
+          // 检查新解锁的成就
+          const newlyUnlocked = ACHIEVEMENTS.filter(a => ach[a.id] && !oldAchievements[a.id]);
+          for (const achievement of newlyUnlocked) {
+            get().triggerAchievementNotification(
+              achievement.title,
+              achievement.description,
+              "🏆"
+            );
+          }
 
           const progress = CARDS.length > 0 ? ownedCount / CARDS.length : 0;
           const newClaimed = { ...st.collectionRewardsClaimed };
@@ -1570,6 +1633,45 @@ export const useGameStore = create<GameState>()(
         set({ rewardAnimation: null });
       },
 
+      triggerAchievementNotification: (title, message, icon) => {
+        set({ 
+          achievementNotification: { 
+            visible: true, 
+            title, 
+            message, 
+            icon 
+          } 
+        });
+      },
+
+      dismissAchievementNotification: () => {
+        set({ 
+          achievementNotification: { 
+            ...get().achievementNotification, 
+            visible: false 
+          } 
+        });
+      },
+
+      showSmartTip: (tipType) => {
+        const state = get();
+        const key = `hasSeen${tipType.charAt(0).toUpperCase() + tipType.slice(1)}Tip` as keyof typeof state.smartTips;
+        if (state.smartTips[key]) return false;
+        
+        set((s) => ({
+          smartTips: {
+            ...s.smartTips,
+            [key]: true,
+            lastTipShown: tipType,
+          }
+        }));
+        return true;
+      },
+
+      setLoading: (isLoading, message = "") => {
+        set({ isLoading, loadingMessage: message });
+      },
+
       saveToCloud: async () => {
         try {
           const { hasSupabase } = await import("../backend/supabaseClient");
@@ -1720,6 +1822,7 @@ export const useGameStore = create<GameState>()(
         totalCheckIns: s.totalCheckIns,
         tutorialStep: s.tutorialStep,
         tutorialCompleted: s.tutorialCompleted,
+        smartTips: s.smartTips,
         cloudSaveEnabled: s.cloudSaveEnabled,
         cloudLastSavedAt: s.cloudLastSavedAt,
         cloudLastSyncedAt: s.cloudLastSyncedAt,
