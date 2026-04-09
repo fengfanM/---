@@ -28,6 +28,7 @@ import { PortraitWorkshop } from "./features/portraits/PortraitWorkshop";
 import { AchievementNotification } from "./components/Notification";
 import { LoadingOverlay } from "./components/Loading";
 import { StatsDashboard } from "./components/StatsDashboard";
+import CollectionModal from "./components/CollectionModal";
 
 function rarityClass(r: string): string {
   if (r === "SSR") return "rarity-ssr";
@@ -1574,6 +1575,49 @@ function RitualDrag({
 
 function HomeTab() {
   const [openId, setOpenId] = useState<string | null>("rules");
+  const [collectionModalRarity, setCollectionModalRarity] = useState<'N' | 'R' | 'SR' | 'SSR' | null>(null);
+  const totalPulls = useGameStore((s) => s.totalPulls);
+  const stats = useGameStore((s) => s.stats);
+  const inventory = useGameStore((s) => s.inventory);
+  const checkInStreak = useGameStore((s) => s.checkInStreak);
+  const pullsSinceSR = useGameStore((s) => s.pullsSinceSR);
+  const pullsSinceSSR = useGameStore((s) => s.pullsSinceSSR);
+  
+  const collectionPercent = useMemo(() => {
+    const totalCards = CARDS.length;
+    const collectedCards = Object.keys(inventory).length;
+    return Math.round((collectedCards / totalCards) * 100);
+  }, [inventory]);
+  
+  const nCards = useMemo(() => {
+    const nCards = CARDS.filter((c) => c.rarity === 'N').length;
+    const nCollected = CARDS.filter((c) => c.rarity === 'N' && inventory[c.id]).length;
+    return { total: nCards, collected: nCollected, percent: Math.round((nCollected / nCards) * 100) };
+  }, [inventory]);
+  
+  const rCards = useMemo(() => {
+    const rCards = CARDS.filter((c) => c.rarity === 'R').length;
+    const rCollected = CARDS.filter((c) => c.rarity === 'R' && inventory[c.id]).length;
+    return { total: rCards, collected: rCollected, percent: Math.round((rCollected / rCards) * 100) };
+  }, [inventory]);
+  
+  const srCards = useMemo(() => {
+    const srCards = CARDS.filter((c) => c.rarity === 'SR').length;
+    const srCollected = CARDS.filter((c) => c.rarity === 'SR' && inventory[c.id]).length;
+    return { total: srCards, collected: srCollected, percent: Math.round((srCollected / srCards) * 100) };
+  }, [inventory]);
+  
+  const ssrCards = useMemo(() => {
+    const ssrCards = CARDS.filter((c) => c.rarity === 'SSR').length;
+    const ssrCollected = CARDS.filter((c) => c.rarity === 'SSR' && inventory[c.id]).length;
+    return { total: ssrCards, collected: ssrCollected, percent: Math.round((ssrCollected / ssrCards) * 100) };
+  }, [inventory]);
+  
+  const nPercent = totalPulls > 0 ? Math.round(((totalPulls - stats.totalSr - stats.totalSsr) / totalPulls) * 100) : 0;
+  const rPercent = totalPulls > 0 ? Math.round(((stats.totalSr - stats.totalSsr) / totalPulls) * 100) : 0;
+  const srPercent = totalPulls > 0 ? Math.round((stats.totalSr / totalPulls) * 100) : 0;
+  const ssrPercent = totalPulls > 0 ? Math.round((stats.totalSsr / totalPulls) * 100) : 0;
+  
   const items = useMemo(
     () => [
       {
@@ -1620,6 +1664,163 @@ function HomeTab() {
         <div className="scroll-title">天机阁</div>
         <div className="scroll-sub">卷轴会随你每日的运势与抽卡历史而展开。</div>
       </div>
+      
+      {/* 数据看板 - 主页最醒目的位置 */}
+      <div className="home-dashboard">
+        <div className="home-dashboard-title">📊 你的成长记录</div>
+        <div className="home-stats-grid">
+          <div className="home-stat-card home-stat-card-primary">
+            <div className="home-stat-icon">🎯</div>
+            <div className="home-stat-value">{totalPulls}</div>
+            <div className="home-stat-label">总抽卡</div>
+          </div>
+          <div className="home-stat-card home-stat-card-gold">
+            <div className="home-stat-icon">⭐</div>
+            <div className="home-stat-value">{stats.totalSr}</div>
+            <div className="home-stat-label">SR卡</div>
+          </div>
+          <div className="home-stat-card home-stat-card-rainbow">
+            <div className="home-stat-icon">🌟</div>
+            <div className="home-stat-value">{stats.totalSsr}</div>
+            <div className="home-stat-label">SSR卡</div>
+          </div>
+          <div className="home-stat-card home-stat-card-purple">
+            <div className="home-stat-icon">📚</div>
+            <div className="home-stat-value">{collectionPercent}%</div>
+            <div className="home-stat-label">图鉴</div>
+          </div>
+        </div>
+        
+        {/* 迷你图表区域 */}
+        <div className="home-mini-charts">
+          {/* 抽卡分布饼图 */}
+          <div className="home-mini-chart home-pie-chart">
+            <div className="home-mini-chart-title">抽卡分布</div>
+            <div className="home-pie-wrapper">
+              <div 
+                className="home-pie" 
+                style={
+                  {
+                    '--n-percent': `${nPercent}%`,
+                    '--r-percent': `${rPercent}%`,
+                    '--sr-percent': `${srPercent}%`,
+                    '--ssr-percent': `${ssrPercent}%`
+                  } as React.CSSProperties
+                }
+              />
+              <div className="home-pie-center">
+                <div className="home-pie-center-value">{totalPulls}</div>
+                <div className="home-pie-center-label">抽</div>
+              </div>
+            </div>
+            <div className="home-pie-legend">
+              <div className="home-pie-legend-item">
+                <span className="home-pie-dot n" />
+                <span className="home-pie-text">N</span>
+              </div>
+              <div className="home-pie-legend-item">
+                <span className="home-pie-dot r" />
+                <span className="home-pie-text">R</span>
+              </div>
+              <div className="home-pie-legend-item">
+                <span className="home-pie-dot sr" />
+                <span className="home-pie-text">SR</span>
+              </div>
+              <div className="home-pie-legend-item">
+                <span className="home-pie-dot ssr" />
+                <span className="home-pie-text">SSR</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* 保底进度 */}
+          <div className="home-mini-chart home-guarantee-chart">
+            <div className="home-mini-chart-title">保底进度</div>
+            <div className="home-guarantee-item">
+              <div className="home-guarantee-header">
+                <span className="home-guarantee-label">SR</span>
+                <span className="home-guarantee-value">{10 - pullsSinceSR}/10</span>
+              </div>
+              <div className="home-guarantee-bar">
+                <div 
+                  className="home-guarantee-fill sr" 
+                  style={{ width: `${(pullsSinceSR / 10) * 100}%` }}
+                />
+              </div>
+            </div>
+            <div className="home-guarantee-item">
+              <div className="home-guarantee-header">
+                <span className="home-guarantee-label">SSR</span>
+                <span className="home-guarantee-value">{50 - pullsSinceSSR}/50</span>
+              </div>
+              <div className="home-guarantee-bar">
+                <div 
+                  className="home-guarantee-fill ssr" 
+                  style={{ width: `${(pullsSinceSSR / 50) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* 图鉴收集柱状图 */}
+          <div className="home-mini-chart home-collection-chart">
+            <div className="home-mini-chart-title">图鉴进度</div>
+            <div className="home-collection-bars">
+              <div className="home-collection-bar">
+                <div className="home-collection-bar-value">{nCards.collected}/{nCards.total}</div>
+                <div className="home-collection-bar-fill n" style={{ height: `${nCards.percent}%` }} />
+                <div 
+                  className="home-collection-bar-label"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCollectionModalRarity('N')}
+                >
+                  N
+                </div>
+              </div>
+              <div className="home-collection-bar">
+                <div className="home-collection-bar-value">{rCards.collected}/{rCards.total}</div>
+                <div className="home-collection-bar-fill r" style={{ height: `${rCards.percent}%` }} />
+                <div 
+                  className="home-collection-bar-label"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCollectionModalRarity('R')}
+                >
+                  R
+                </div>
+              </div>
+              <div className="home-collection-bar">
+                <div className="home-collection-bar-value">{srCards.collected}/{srCards.total}</div>
+                <div className="home-collection-bar-fill sr" style={{ height: `${srCards.percent}%` }} />
+                <div 
+                  className="home-collection-bar-label"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCollectionModalRarity('SR')}
+                >
+                  SR
+                </div>
+              </div>
+              <div className="home-collection-bar">
+                <div className="home-collection-bar-value">{ssrCards.collected}/{ssrCards.total}</div>
+                <div className="home-collection-bar-fill ssr" style={{ height: `${ssrCards.percent}%` }} />
+                <div 
+                  className="home-collection-bar-label"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCollectionModalRarity('SSR')}
+                >
+                  SSR
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="home-dashboard-footer">
+          <div className="home-dashboard-info">
+            <span className="home-dashboard-icon">🔥</span>
+            <span>连续签到 {checkInStreak} 天</span>
+          </div>
+        </div>
+      </div>
 
       <div className="scroll-list">
         {items.map((it) => {
@@ -1661,6 +1862,14 @@ function HomeTab() {
           );
         })}
       </div>
+      
+      {collectionModalRarity && (
+        <CollectionModal
+          rarity={collectionModalRarity}
+          inventory={inventory}
+          onClose={() => setCollectionModalRarity(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2043,6 +2252,7 @@ function ProgressTab() {
     { id: 'daily', label: '每日', icon: '日' },
     { id: 'weekly', label: '每周', icon: '周' },
     { id: 'achievements', label: '成就', icon: '成' },
+    { id: 'stats', label: '统计', icon: '统' },
     { id: 'shop', label: '商店', icon: '商' }
   ];
 
@@ -2527,6 +2737,13 @@ function ProgressTab() {
           </div>
         )}
 
+        {/* 统计标签页 */}
+        {activeTab === 'stats' && (
+          <div className="stats-section-content">
+            <StatsDashboard />
+          </div>
+        )}
+
         {/* 商店标签页 */}
         {activeTab === 'shop' && (
           <div className="shop-section">
@@ -2689,11 +2906,6 @@ function ProgressTab() {
                   );
                 })}
               </div>
-            </div>
-
-            <div className="scroll-section">
-              <div className="scroll-section-title">数据统计</div>
-              <StatsDashboard />
             </div>
 
             <div className="scroll-section">
