@@ -145,6 +145,8 @@ function HighlightOverlay({ target }: { target: string }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
+    let animationFrameId: number;
+    
     const updateRect = () => {
       const el = document.querySelector(`[data-highlight-target="${target}"]`);
       if (el) {
@@ -161,13 +163,26 @@ function HighlightOverlay({ target }: { target: string }) {
     };
 
     updateRect();
-    const observer = new MutationObserver(updateRect);
-    observer.observe(document.body, { childList: true, subtree: true });
+    
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(updateRect);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+    
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect);
+    
+    const tabObserver = new MutationObserver(updateRect);
+    const nav = document.querySelector('.tabs');
+    if (nav) {
+      tabObserver.observe(nav, { childList: true, subtree: true, attributes: true });
+    }
 
     return () => {
       observer.disconnect();
+      tabObserver.disconnect();
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect);
     };
@@ -242,6 +257,23 @@ function PullModal({
   const activePoolId = useGameStore((s) => s.activePoolId);
   const pools = poolsJson as PoolDef[];
   const activePool = pools.find((p: PoolDef) => p.id === activePoolId) ?? pools[0];
+  const triggerRewardAnimation = useGameStore((s) => s.triggerRewardAnimation);
+  const tutorialCompleted = useGameStore((s) => s.tutorialCompleted);
+  
+  useEffect(() => {
+    if (!tutorialCompleted) return;
+    
+    const ssrCount = results.filter((r) => r.rarity === "SSR").length;
+    const srCount = results.filter((r) => r.rarity === "SR").length;
+    
+    if (ssrCount > 0) {
+      triggerRewardAnimation("card", ssrCount);
+    } else if (srCount > 0) {
+      triggerRewardAnimation("card", srCount);
+    } else if (results.length > 0) {
+      triggerRewardAnimation("card", results.length);
+    }
+  }, []);
 
   const getArt = (r: PullResult) => {
     const id = r.card.id;
@@ -1012,7 +1044,11 @@ export default function App() {
         {freePulls > 0 && <span className="pill">免费抽 {freePulls}</span>}
         <div className="guarantee-row">
           <div className="guarantee-item" style={{ 
-            animation: pullsSinceSR >= 7 ? "pulse 1s infinite" : "none" 
+            animation: pullsSinceSR >= 7 ? "pulse 1s infinite" : "none",
+            borderColor: pullsSinceSR >= 7 ? "rgba(255, 107, 107, 0.6)" : "transparent",
+            borderWidth: pullsSinceSR >= 7 ? "2px" : "0",
+            borderStyle: "solid",
+            borderRadius: "16px"
           }}>
             <div className="guarantee-label">SR 保底</div>
             <div className="guarantee-value">
@@ -1021,15 +1057,16 @@ export default function App() {
                   className="guarantee-fill sr" 
                   style={{ 
                     width: `${(pullsSinceSR / 10) * 100}%`,
-                    filter: pullsSinceSR >= 7 ? "brightness(1.3)" : "none"
+                    filter: pullsSinceSR >= 5 ? "brightness(1.4)" : pullsSinceSR >= 7 ? "brightness(1.8)" : "none"
                   }} 
                 />
               </div>
               <span 
                 className={`guarantee-count sr`}
                 style={{ 
-                  color: pullsSinceSR >= 7 ? "#ff6b6b" : "inherit",
-                  fontWeight: pullsSinceSR >= 7 ? 800 : 600
+                  color: pullsSinceSR >= 5 ? "#ffa94d" : pullsSinceSR >= 7 ? "#ff6b6b" : "inherit",
+                  fontWeight: pullsSinceSR >= 5 ? 700 : pullsSinceSR >= 7 ? 900 : 600,
+                  fontSize: pullsSinceSR >= 7 ? "1.15rem" : "1rem"
                 }}
               >
                 {10 - pullsSinceSR}/10
@@ -1037,14 +1074,21 @@ export default function App() {
             </div>
             <div style={{ 
               fontSize: "0.75rem", 
-              color: "var(--muted)", 
-              marginTop: "0.2rem" 
+              color: pullsSinceSR >= 7 ? "#ff6b6b" : pullsSinceSR >= 5 ? "#ffa94d" : "var(--muted)", 
+              marginTop: "0.2rem",
+              fontWeight: pullsSinceSR >= 7 ? 700 : 400
             }}>
-              {pullsSinceSR >= 7 ? "即将保底！" : `进度 ${Math.round((pullsSinceSR / 10) * 100)}%`}
+              {pullsSinceSR >= 7 ? "🔥 即将保底！下一张就是 SR+" : 
+               pullsSinceSR >= 5 ? "⚠️ 即将接近保底" : 
+               `进度 ${Math.round((pullsSinceSR / 10) * 100)}%`}
             </div>
           </div>
           <div className="guarantee-item" style={{ 
-            animation: pullsSinceSSR >= 45 ? "pulse 1s infinite" : "none" 
+            animation: pullsSinceSSR >= 40 ? "pulse 1s infinite" : "none",
+            borderColor: pullsSinceSSR >= 40 ? "rgba(255, 107, 107, 0.6)" : pullsSinceSSR >= 30 ? "rgba(255, 169, 77, 0.4)" : "transparent",
+            borderWidth: pullsSinceSSR >= 30 ? "2px" : "0",
+            borderStyle: "solid",
+            borderRadius: "16px"
           }}>
             <div className="guarantee-label">SSR 保底</div>
             <div className="guarantee-value">
@@ -1053,15 +1097,16 @@ export default function App() {
                   className="guarantee-fill ssr" 
                   style={{ 
                     width: `${(pullsSinceSSR / 50) * 100}%`,
-                    filter: pullsSinceSSR >= 35 ? "brightness(1.3)" : "none"
+                    filter: pullsSinceSSR >= 30 ? "brightness(1.4)" : pullsSinceSSR >= 40 ? "brightness(1.8)" : "none"
                   }} 
                 />
               </div>
               <span 
                 className={`guarantee-count ssr`}
                 style={{ 
-                  color: pullsSinceSSR >= 35 ? "#ff6b6b" : "inherit",
-                  fontWeight: pullsSinceSSR >= 35 ? 800 : 600
+                  color: pullsSinceSSR >= 30 ? "#ffa94d" : pullsSinceSSR >= 40 ? "#ff6b6b" : "inherit",
+                  fontWeight: pullsSinceSSR >= 30 ? 700 : pullsSinceSSR >= 40 ? 900 : 600,
+                  fontSize: pullsSinceSSR >= 40 ? "1.15rem" : "1rem"
                 }}
               >
                 {50 - pullsSinceSSR}/50
@@ -1069,10 +1114,13 @@ export default function App() {
             </div>
             <div style={{ 
               fontSize: "0.75rem", 
-              color: "var(--muted)", 
-              marginTop: "0.2rem" 
+              color: pullsSinceSSR >= 40 ? "#ff6b6b" : pullsSinceSSR >= 30 ? "#ffa94d" : "var(--muted)", 
+              marginTop: "0.2rem",
+              fontWeight: pullsSinceSSR >= 40 ? 700 : 400
             }}>
-              {pullsSinceSSR >= 35 ? "即将保底！" : `进度 ${Math.round((pullsSinceSSR / 50) * 100)}%`}
+              {pullsSinceSSR >= 40 ? "🔥 即将保底！下一张就是 SSR！" : 
+               pullsSinceSSR >= 30 ? "⚠️ 即将接近保底" : 
+               `进度 ${Math.round((pullsSinceSSR / 50) * 100)}%`}
             </div>
           </div>
         </div>
@@ -1096,8 +1144,12 @@ export default function App() {
               if (soundOn && tab !== it.id) void playSfx("click", 0.5);
               setTab(it.id);
             }}
+            aria-label={`切换到${it.label}页面`}
+            aria-pressed={tab === it.id}
+            role="tab"
+            aria-selected={tab === it.id}
           >
-            <span className="tab-ico" aria-hidden>
+            <span className="tab-ico" aria-hidden="true">
               {it.icon}
             </span>
             <span className="tab-label">{it.label}</span>
@@ -1967,6 +2019,8 @@ function ProgressTab() {
                 disabled={isCheckedInToday}
                 onClick={handleCheckIn}
                 data-highlight-target="checkin-button"
+                aria-label={isCheckedInToday ? "今日已签到" : "点击立即签到领取灵石奖励"}
+                aria-pressed={isCheckedInToday}
               >
                 {isCheckedInToday ? "已签到" : "立即签到"}
               </button>
@@ -3830,6 +3884,45 @@ function HelpTab() {
               </div>
               <div className="scroll-row2">
                 你可以为喜欢的卡牌上传自定义立绘图片，让它们更符合你的喜好！
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="scroll-section">
+        <div className="scroll-section-title">卡牌深度系统</div>
+        <div className="scroll-list">
+          <div className="scroll-item">
+            <div className="scroll-main">
+              <div className="scroll-row1">
+                <span className="scroll-name">属性相克</span>
+                <span className="scroll-meta">金木水火土阴阳</span>
+              </div>
+              <div className="scroll-row2">
+                每张卡牌都有属性！属性相生相克：金克木，木克土，土克水，水克火，火克金，阴阳互克。组成卡组时可搭配克制敌人的属性！
+              </div>
+            </div>
+          </div>
+          <div className="scroll-item">
+            <div className="scroll-main">
+              <div className="scroll-row1">
+                <span className="scroll-name">套装效果</span>
+                <span className="scroll-meta">收集特定卡牌</span>
+              </div>
+              <div className="scroll-row2">
+                收集特定组合的卡牌可触发套装加成！提升抽卡运气、减少保底、灵石加倍等！
+              </div>
+            </div>
+          </div>
+          <div className="scroll-item">
+            <div className="scroll-main">
+              <div className="scroll-row1">
+                <span className="scroll-name">卡牌突破</span>
+                <span className="scroll-meta">消耗卡牌与灵石</span>
+              </div>
+              <div className="scroll-row2">
+                SR及以上卡牌可消耗相同卡牌和灵石进行突破！突破1/2/3级分别提升技能效果10%/20%/35%！
               </div>
             </div>
           </div>

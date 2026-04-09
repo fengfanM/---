@@ -52,9 +52,9 @@ const CARD_SETS: CardSet[] = [
 ];
 
 const BREAKTHROUGH_LEVELS = [
-  { level: 1, requiredCards: 3, requiredCoins: 500, bonusDescription: "技能效果+10%" },
-  { level: 2, requiredCards: 5, requiredCoins: 1000, bonusDescription: "技能效果+20%" },
-  { level: 3, requiredCards: 10, requiredCoins: 2500, bonusDescription: "技能效果+35%" },
+  { level: 1, requiredCards: 2, requiredCoins: 300, bonusDescription: "技能效果+10%" },
+  { level: 2, requiredCards: 3, requiredCoins: 600, bonusDescription: "技能效果+20%" },
+  { level: 3, requiredCards: 5, requiredCoins: 1500, bonusDescription: "技能效果+35%" },
 ];
 
 export function todayKey(): string {
