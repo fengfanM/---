@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useGameStore, CARDS } from '../store/gameStore';
+import StatsDetailModal, { type StatDetailType } from './StatsDetailModal';
 
 export function StatsDashboard() {
   const inventory = useGameStore((s) => s.inventory);
@@ -9,6 +10,8 @@ export function StatsDashboard() {
   const pullsSinceSSR = useGameStore((s) => s.pullsSinceSSR);
   const checkInStreak = useGameStore((s) => s.checkInStreak);
   const totalCheckIns = useGameStore((s) => s.totalCheckIns);
+
+  const [detailType, setDetailType] = useState<StatDetailType | null>(null);
 
   const collectionStats = useMemo(() => {
     const totalCards = CARDS.length;
@@ -38,25 +41,37 @@ export function StatsDashboard() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card stat-card-glow">
+        <div 
+          className="stat-card stat-card-glow clickable" 
+          onClick={() => setDetailType('pulls')}
+        >
           <div className="stat-icon">🎯</div>
           <div className="stat-value">{totalPulls}</div>
           <div className="stat-label">总抽卡次数</div>
         </div>
 
-        <div className="stat-card stat-card-glow gold">
+        <div 
+          className="stat-card stat-card-glow gold clickable" 
+          onClick={() => setDetailType('sr')}
+        >
           <div className="stat-icon">⭐</div>
           <div className="stat-value">{stats.totalSr}</div>
           <div className="stat-label">获得SR卡</div>
         </div>
 
-        <div className="stat-card stat-card-glow rainbow">
+        <div 
+          className="stat-card stat-card-glow rainbow clickable" 
+          onClick={() => setDetailType('ssr')}
+        >
           <div className="stat-icon">🌟</div>
           <div className="stat-value">{stats.totalSsr}</div>
           <div className="stat-label">获得SSR卡</div>
         </div>
 
-        <div className="stat-card stat-card-glow purple">
+        <div 
+          className="stat-card stat-card-glow purple clickable" 
+          onClick={() => setDetailType('collection')}
+        >
           <div className="stat-icon">📚</div>
           <div className="stat-value">{collectionStats.collectionPercent}%</div>
           <div className="stat-label">图鉴完成度</div>
@@ -253,6 +268,13 @@ export function StatsDashboard() {
           </div>
         </div>
       </div>
+
+      {detailType && (
+        <StatsDetailModal 
+          type={detailType} 
+          onClose={() => setDetailType(null)} 
+        />
+      )}
     </div>
   );
 }

@@ -3386,41 +3386,54 @@ function CollectionTab() {
                 </button>
               ))}
             </div>
+            
+            <div style={{ marginBottom: "0.6rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.3rem" }}>排序方式</div>
+              <div className="btn-row" style={{ gap: "0.45rem" }}>
+                <button
+                  type="button"
+                  className={sortBy === "rarity" ? "btn btn-primary" : "btn btn-paper"}
+                  onClick={() => setSortBy("rarity")}
+                >
+                  按稀有度
+                </button>
+                <button
+                  type="button"
+                  className={sortBy === "name" ? "btn btn-primary" : "btn btn-paper"}
+                  onClick={() => setSortBy("name")}
+                >
+                  按名称
+                </button>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: "0.6rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.3rem" }}>筛选条件</div>
+              <div className="btn-row" style={{ gap: "0.45rem" }}>
+                <button
+                  type="button"
+                  className={ownedOnly ? "btn btn-primary" : "btn btn-paper"}
+                  onClick={() => {
+                    setOwnedOnly(!ownedOnly);
+                    if (!ownedOnly) setMissingOnly(false);
+                  }}
+                >
+                  只看已拥有
+                </button>
+                <button
+                  type="button"
+                  className={missingOnly ? "btn btn-primary" : "btn btn-paper"}
+                  onClick={() => {
+                    setMissingOnly(!missingOnly);
+                    if (!missingOnly) setOwnedOnly(false);
+                  }}
+                >
+                  只看未获得
+                </button>
+              </div>
+            </div>
+            
             <div className="btn-row" style={{ gap: "0.45rem" }}>
-              <button
-                type="button"
-                className={sortBy === "rarity" ? "btn btn-primary" : "btn btn-paper"}
-                onClick={() => setSortBy("rarity")}
-              >
-                按稀有度
-              </button>
-              <button
-                type="button"
-                className={sortBy === "name" ? "btn btn-primary" : "btn btn-paper"}
-                onClick={() => setSortBy("name")}
-              >
-                按名称
-              </button>
-              <button
-                type="button"
-                className={ownedOnly ? "btn btn-primary" : "btn btn-paper"}
-                onClick={() => {
-                  setOwnedOnly(!ownedOnly);
-                  if (!ownedOnly) setMissingOnly(false);
-                }}
-              >
-                只看已拥有
-              </button>
-              <button
-                type="button"
-                className={missingOnly ? "btn btn-primary" : "btn btn-paper"}
-                onClick={() => {
-                  setMissingOnly(!missingOnly);
-                  if (!missingOnly) setOwnedOnly(false);
-                }}
-              >
-                只看未获得
-              </button>
               <button
                 type="button"
                 className="btn btn-paper"
