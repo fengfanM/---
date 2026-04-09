@@ -11,6 +11,13 @@ import type {
   AchievementLevelReward,
   DailyActiveReward,
   DailyActiveProgress,
+  DailyPrivilegeUsage,
+  Deck,
+  CardSkill,
+  CardSet,
+  ElementAdvantage,
+  CardBreakthroughState,
+  Element,
 } from "../types";
 import { rollBatch } from "../features/gacha/gachaEngine";
 import { generateDailyFortune } from "../features/divination/fortuneTemplates";
@@ -20,6 +27,35 @@ import { createRng, hashString } from "../lib/rng";
 const SAVE_VERSION = 1;
 const CARDS = cardsJson as CardDef[];
 const POOLS = poolsJson as PoolDef[];
+
+const ELEMENT_ADVANTAGE: ElementAdvantage = {
+  金: { strong: ["木"], weak: ["火"] },
+  木: { strong: ["土"], weak: ["金"] },
+  水: { strong: ["火"], weak: ["土"] },
+  火: { strong: ["金"], weak: ["水"] },
+  土: { strong: ["水"], weak: ["木"] },
+  阴: { strong: ["阳"], weak: ["阳"] },
+  阳: { strong: ["阴"], weak: ["阴"] },
+};
+
+const CARD_SETS: CardSet[] = [
+  {
+    id: "four_symbols",
+    name: "四象神兽",
+    description: "收集四象神兽卡牌，获得强大加成",
+    cardIds: [],
+    bonuses: [
+      { count: 2, description: "SR概率+2%", effect: "increase_luck" as const, value: 2 },
+      { count: 4, description: "SSR概率+2%", effect: "increase_luck" as const, value: 2 },
+    ],
+  },
+];
+
+const BREAKTHROUGH_LEVELS = [
+  { level: 1, requiredCards: 3, requiredCoins: 500, bonusDescription: "技能效果+10%" },
+  { level: 2, requiredCards: 5, requiredCoins: 1000, bonusDescription: "技能效果+20%" },
+  { level: 3, requiredCards: 10, requiredCoins: 2500, bonusDescription: "技能效果+35%" },
+];
 
 export function todayKey(): string {
   const d = new Date();
@@ -43,15 +79,15 @@ interface TaskDef {
 }
 
 const TASK_DEFS: readonly TaskDef[] = [
-  { id: "t_pull1", title: "进行一次卜问", target: 1, reward: 15, type: "daily" },
-  { id: "t_pull10", title: "进行十次卜问", target: 10, reward: 30, type: "daily" },
-  { id: "t_fortune", title: "查看今日运势", target: 1, reward: 20, type: "daily" },
-  { id: "t_three", title: "完成一次三牌阵", target: 1, reward: 25, type: "daily" },
-  { id: "t_wheel", title: "转动命运轮盘", target: 1, reward: 10, type: "daily" },
-  { id: "t_weekly_pull", title: "本周完成 50 次抽卡", target: 50, reward: 150, type: "weekly" },
-  { id: "t_weekly_ssr", title: "本周获得 1 张 SSR", target: 1, reward: 100, type: "weekly" },
-  { id: "t_weekly_fortune", title: "本周查看 5 次每日运势", target: 5, reward: 80, type: "weekly" },
-  { id: "t_weekly_three", title: "本周完成 3 次三牌阵", target: 3, reward: 70, type: "weekly" },
+  { id: "t_pull1", title: "进行一次卜问", target: 1, reward: 10, type: "daily" },
+  { id: "t_pull10", title: "进行十次卜问", target: 10, reward: 20, type: "daily" },
+  { id: "t_fortune", title: "查看今日运势", target: 1, reward: 12, type: "daily" },
+  { id: "t_three", title: "完成一次三牌阵", target: 1, reward: 15, type: "daily" },
+  { id: "t_wheel", title: "转动命运轮盘", target: 1, reward: 8, type: "daily" },
+  { id: "t_weekly_pull", title: "本周完成 50 次抽卡", target: 50, reward: 100, type: "weekly" },
+  { id: "t_weekly_ssr", title: "本周获得 1 张 SSR", target: 1, reward: 70, type: "weekly" },
+  { id: "t_weekly_fortune", title: "本周查看 5 次每日运势", target: 5, reward: 50, type: "weekly" },
+  { id: "t_weekly_three", title: "本周完成 3 次三牌阵", target: 3, reward: 45, type: "weekly" },
 ] as const;
 
 const COLLECTION_REWARDS = [
@@ -81,6 +117,34 @@ export const DAILY_ACTIVE_REWARDS: readonly DailyActiveReward[] = [
   { id: "da_150", title: "活跃达人", points: 150, reward: 250, description: "完成 150 活跃点" },
   { id: "da_200", title: "今日之星", points: 200, reward: 400, description: "完成 200 活跃点" },
 ] as const;
+
+export const ACHIEVEMENT_SHOP_ITEMS = [
+  { id: "shop_coins_100", title: "灵石 100", description: "兑换 100 灵石", cost: 20, type: "coins" as const, value: 100 },
+  { id: "shop_coins_500", title: "灵石 500", description: "兑换 500 灵石", cost: 80, type: "coins" as const, value: 500 },
+  { id: "shop_coins_1000", title: "灵石 1000", description: "兑换 1000 灵石", cost: 150, type: "coins" as const, value: 1000 },
+  { id: "shop_free_pull_1", title: "免费抽 1 次", description: "兑换 1 次免费抽卡", cost: 50, type: "freePulls" as const, value: 1 },
+  { id: "shop_free_pull_5", title: "免费抽 5 次", description: "兑换 5 次免费抽卡", cost: 200, type: "freePulls" as const, value: 5 },
+] as const;
+
+export const DAILY_PRIVILEGES = [
+  { id: "priv_free_pull", title: "每日免费抽", description: "每日可免费抽卡 1 次", requiredLevel: 3 },
+  { id: "priv_double_reward", title: "双倍奖励", description: "今日签到奖励翻倍", requiredLevel: 5 },
+  { id: "priv_extra_coins", title: "额外灵石", description: "每日额外获得 50 灵石", requiredLevel: 7 },
+  { id: "priv_pity_buff", title: "保底加成", description: "SSR 保底进度减 5", requiredLevel: 9 },
+] as const;
+
+function isWeekend(): boolean {
+  const now = new Date();
+  const day = now.getDay();
+  return day === 0 || day === 6;
+}
+
+function getCurrentWeekendActivity(): { id: string; type: "double_coins" | "double_task"; multiplier: number } | null {
+  if (isWeekend()) {
+    return { id: "weekend_double", type: "double_coins", multiplier: 2 };
+  }
+  return null;
+}
 
 const ACHIEVEMENTS = [
   { id: "a_first", title: "初次卜问", description: "完成第一次抽卡", points: 10 },
@@ -166,6 +230,33 @@ interface GameState {
   checkInDate: string | null;
   checkInStreak: number;
   totalCheckIns: number;
+  /** 新手引导 */
+  tutorialStep: number;
+  tutorialCompleted: boolean;
+  /** 云存档相关 */
+  cloudSaveEnabled: boolean;
+  cloudLastSavedAt: string | null;
+  cloudLastSyncedAt: string | null;
+  /** 用户名 */
+  username: string | null;
+  usernameSet: boolean;
+  /** 成就商店兑换记录 */
+  achievementShopPurchased: Record<string, number>;
+  /** 每日特权使用记录 */
+  dailyPrivilegeUsage: DailyPrivilegeUsage;
+  /** 卡组系统 */
+  activeDeck: string | null;
+  decks: Record<string, Deck>;
+  /** 卡牌等级 */
+  cardLevels: Record<string, number>;
+  /** 卡牌突破等级 */
+  cardBreakthroughs: CardBreakthroughState;
+  /** 奖励动画状态 */
+  rewardAnimation: {
+    visible: boolean;
+    type: "coins" | "card" | "achievement" | "level";
+    amount: number;
+  } | null;
 
   /** actions */
   resetAll: () => void;
@@ -191,6 +282,27 @@ interface GameState {
   claimAchievementLevelReward: (level: number) => { success: boolean; reward: number; title: string };
   addDailyActivePoints: (points: number) => void;
   claimDailyActiveReward: (id: string) => { success: boolean; reward: number; title: string };
+  advanceTutorial: () => void;
+  skipTutorial: () => void;
+  saveToCloud: () => Promise<{ success: boolean; error?: string }>;
+  loadFromCloud: () => Promise<{ success: boolean; error?: string; hasData?: boolean }>;
+  toggleCloudSave: () => void;
+  setUsername: (name: string) => void;
+  purchaseFromAchievementShop: (itemId: string) => { success: boolean; error?: string };
+  useDailyPrivilege: (privilegeId: string) => { success: boolean; error?: string };
+  getCurrentMultiplier: (type: "coins" | "task") => number;
+  createDeck: (name: string) => { success: boolean; deckId: string };
+  deleteDeck: (deckId: string) => { success: boolean; error?: string };
+  addCardToDeck: (deckId: string, cardId: string) => { success: boolean; error?: string };
+  removeCardFromDeck: (deckId: string, cardId: string) => { success: boolean; error?: string };
+  setActiveDeck: (deckId: string | null) => void;
+  upgradeCard: (cardId: string) => { success: boolean; error?: string };
+  getDeckCardSkills: () => CardSkill[];
+  breakthroughCard: (cardId: string) => { success: boolean; error?: string };
+  getElementAdvantage: (element: Element) => { strong: Element[]; weak: Element[] };
+  getSetBonuses: () => Array<{ setName: string; bonus: string; effect: string; value: number }>;
+  triggerRewardAnimation: (type: "coins" | "card" | "achievement" | "level", amount: number) => void;
+  dismissRewardAnimation: () => void;
 }
 
 function initialState(): Omit<
@@ -218,10 +330,31 @@ function initialState(): Omit<
   | "claimAchievementLevelReward"
   | "addDailyActivePoints"
   | "claimDailyActiveReward"
+  | "advanceTutorial"
+  | "skipTutorial"
+  | "saveToCloud"
+  | "loadFromCloud"
+  | "toggleCloudSave"
+  | "setUsername"
+  | "purchaseFromAchievementShop"
+  | "useDailyPrivilege"
+  | "getCurrentMultiplier"
+  | "createDeck"
+  | "deleteDeck"
+  | "addCardToDeck"
+  | "removeCardFromDeck"
+  | "setActiveDeck"
+  | "upgradeCard"
+  | "getDeckCardSkills"
+  | "breakthroughCard"
+  | "getElementAdvantage"
+  | "getSetBonuses"
+  | "triggerRewardAnimation"
+  | "dismissRewardAnimation"
 > {
   return {
     saveVersion: SAVE_VERSION,
-    coins: 50000,
+    coins: 3000,
     activePoolId: "permanent",
     ssrUpGuarantee: false,
     fatePoints: 0,
@@ -274,6 +407,23 @@ function initialState(): Omit<
     checkInDate: null,
     checkInStreak: 0,
     totalCheckIns: 0,
+    tutorialStep: 0,
+    tutorialCompleted: false,
+    cloudSaveEnabled: false,
+    cloudLastSavedAt: null,
+    cloudLastSyncedAt: null,
+    username: null,
+    usernameSet: false,
+    achievementShopPurchased: {},
+    dailyPrivilegeUsage: {
+      date: null,
+      used: {},
+    },
+    activeDeck: null,
+    decks: {},
+    cardLevels: {},
+    cardBreakthroughs: {},
+    rewardAnimation: null,
   };
 }
 
@@ -314,7 +464,9 @@ export const useGameStore = create<GameState>()(
           streak = diffDays === 1 ? streak + 1 : 1;
         }
 
-        const reward = Math.min(50 + (streak - 1) * 10, 200);
+        const baseReward = Math.min(30 + (streak - 1) * 8, 100);
+        const multiplier = s.getCurrentMultiplier("coins");
+        const reward = baseReward * multiplier;
 
         set((st) => {
           let currentActive = { ...st.dailyActive };
@@ -331,6 +483,8 @@ export const useGameStore = create<GameState>()(
             dailyActive: currentActive,
           };
         });
+
+        get().triggerRewardAnimation("coins", reward);
 
         return { success: true, reward };
       },
@@ -403,6 +557,8 @@ export const useGameStore = create<GameState>()(
           },
         }));
 
+        get().triggerRewardAnimation("achievement", rewardDef.reward);
+
         return { success: true, reward: rewardDef.reward, title: rewardDef.title };
       },
 
@@ -442,6 +598,8 @@ export const useGameStore = create<GameState>()(
           },
         }));
 
+        get().triggerRewardAnimation("coins", rewardDef.reward);
+
         return { success: true, reward: rewardDef.reward, title: rewardDef.title };
       },
 
@@ -474,6 +632,7 @@ export const useGameStore = create<GameState>()(
             lastLoginDate: t,
             streak,
             achievements,
+            freePulls: 3,
             taskProgress: {},
             taskClaimed: {},
             taskClaimedDay: null,
@@ -518,10 +677,43 @@ export const useGameStore = create<GameState>()(
           (hashString(`pull-${Date.now()}-${Math.random()}`) ^ s.totalPulls) >>>
           0;
         const wb = s.wheelBuff;
-        const gachaBuff =
-          wb && (wb.srBonus > 0 || wb.ssrBonus > 0)
-            ? { srBonus: wb.srBonus, ssrBonus: wb.ssrBonus }
-            : null;
+        
+        let ssrBonus = 0;
+        let srBonus = 0;
+        let pityReduction = 0;
+        
+        if (wb) {
+          ssrBonus += wb.ssrBonus;
+          srBonus += wb.srBonus;
+        }
+        
+        const skills = s.getDeckCardSkills();
+        for (const skill of skills) {
+          if (skill.effect === "increase_luck") {
+            ssrBonus += skill.value * 0.1;
+            srBonus += skill.value * 0.05;
+          } else if (skill.effect === "decrease_pity") {
+            pityReduction += skill.value;
+          }
+        }
+        
+        if (s.dailyFortune) {
+          if (s.dailyFortune.sign === "上上签") {
+            ssrBonus += 3;
+            srBonus += 2;
+          } else if (s.dailyFortune.sign === "上签") {
+            ssrBonus += 1;
+            srBonus += 1;
+          } else if (s.dailyFortune.sign === "下签" || s.dailyFortune.sign === "下下签") {
+            ssrBonus -= 1;
+            srBonus -= 1;
+          }
+        }
+        
+        const gachaBuff = {
+          ssrBonus: Math.max(0, ssrBonus),
+          srBonus: Math.max(0, srBonus),
+        };
 
         const pool = POOLS.find((p) => p.id === s.activePoolId) ?? POOLS[0]!;
         const { results, finalSR, finalSSR, finalUpGuarantee } = rollBatch(
@@ -531,7 +723,7 @@ export const useGameStore = create<GameState>()(
           1,
           () => ({
             sr: s.pullsSinceSR,
-            ssr: s.pullsSinceSSR,
+            ssr: Math.max(0, s.pullsSinceSSR - pityReduction),
             upGuarantee: s.ssrUpGuarantee,
           }),
           gachaBuff
@@ -659,7 +851,7 @@ export const useGameStore = create<GameState>()(
 
       pullTen: () => {
         const s = get();
-        const baseCost = 90;
+        const baseCost = 80;
         const wild = s.wheelBuff?.id === "wild";
         const cost = wild ? baseCost - 10 : baseCost;
         if (s.coins < cost) return null;
@@ -669,10 +861,43 @@ export const useGameStore = create<GameState>()(
           (hashString(`ten-${Date.now()}-${Math.random()}`) ^ s.totalPulls) >>>
           0;
         const wb = s.wheelBuff;
-        const gachaBuff =
-          wb && (wb.srBonus > 0 || wb.ssrBonus > 0)
-            ? { srBonus: wb.srBonus, ssrBonus: wb.ssrBonus }
-            : null;
+        
+        let ssrBonus = 0;
+        let srBonus = 0;
+        let pityReduction = 0;
+        
+        if (wb) {
+          ssrBonus += wb.ssrBonus;
+          srBonus += wb.srBonus;
+        }
+        
+        const skills = s.getDeckCardSkills();
+        for (const skill of skills) {
+          if (skill.effect === "increase_luck") {
+            ssrBonus += skill.value * 0.1;
+            srBonus += skill.value * 0.05;
+          } else if (skill.effect === "decrease_pity") {
+            pityReduction += skill.value;
+          }
+        }
+        
+        if (s.dailyFortune) {
+          if (s.dailyFortune.sign === "上上签") {
+            ssrBonus += 3;
+            srBonus += 2;
+          } else if (s.dailyFortune.sign === "上签") {
+            ssrBonus += 1;
+            srBonus += 1;
+          } else if (s.dailyFortune.sign === "下签" || s.dailyFortune.sign === "下下签") {
+            ssrBonus -= 1;
+            srBonus -= 1;
+          }
+        }
+        
+        const gachaBuff = {
+          ssrBonus: Math.max(0, ssrBonus),
+          srBonus: Math.max(0, srBonus),
+        };
 
         const pool = POOLS.find((p) => p.id === s.activePoolId) ?? POOLS[0]!;
         const { results, finalSR, finalSSR, finalUpGuarantee } = rollBatch(
@@ -682,7 +907,7 @@ export const useGameStore = create<GameState>()(
           count,
           () => ({
             sr: s.pullsSinceSR,
-            ssr: s.pullsSinceSSR,
+            ssr: Math.max(0, s.pullsSinceSSR - pityReduction),
             upGuarantee: s.ssrUpGuarantee,
           }),
           gachaBuff
@@ -852,10 +1077,21 @@ export const useGameStore = create<GameState>()(
         const rng = createRng(seed);
         rng();
         const picks: string[] = [];
+        const state = get();
+        
+        const ownedCardIds = Object.keys(state.inventory).filter((id) => (state.inventory[id] ?? 0) > 0);
+        
         for (let i = 0; i < 3; i++) {
-          const c = CARDS[Math.floor(rng() * CARDS.length)];
+          let c;
+          if (ownedCardIds.length > 0) {
+            c = CARDS.find((card) => card.id === ownedCardIds[Math.floor(rng() * ownedCardIds.length)]);
+          }
+          if (!c) {
+            c = CARDS[Math.floor(rng() * CARDS.length)];
+          }
           if (c) picks.push(c.id);
         }
+        
         set((s) => {
           const tp = { ...s.taskProgress };
           tp.t_three = 1;
@@ -949,39 +1185,490 @@ export const useGameStore = create<GameState>()(
         const t = todayKey();
         const def = TASK_DEFS.find((d) => d.id === taskId);
         if (!def) return;
+        const state = get();
+        let claimed = { ...state.taskClaimed };
+        if (state.taskClaimedDay !== t) {
+          claimed = {};
+        }
+        if (claimed[taskId]) return;
+        const prog = state.taskProgress[taskId] ?? 0;
+        if (prog < def.target) return;
+        const activityMultiplier = state.getCurrentMultiplier("coins");
+        const reward = Math.floor(def.reward * state.taskRewardMultiplier * activityMultiplier);
+        let mult = state.taskRewardMultiplier;
+        if (mult > 1) mult = 1;
+        const stats = { ...state.stats };
+        stats.taskCompletedCount += 1;
+        const ach = { ...state.achievements };
+        if (stats.taskCompletedCount >= 100) ach.a_task_master = true;
+        
+        let currentActive = { ...state.dailyActive };
+        if (currentActive.date !== t) {
+          currentActive = { date: t, points: 0, claimed: {} };
+        }
+        currentActive.points += 20;
+        
+        set((s) => ({
+          ...s,
+          coins: s.coins + reward,
+          taskClaimedDay: t,
+          taskClaimed: { ...claimed, [taskId]: true },
+          taskRewardMultiplier: mult,
+          stats,
+          achievements: ach,
+          dailyActive: currentActive,
+        }));
+        
+        get().triggerRewardAnimation("coins", reward);
+      },
+
+      advanceTutorial: () => {
         set((s) => {
-          let claimed = { ...s.taskClaimed };
-          if (s.taskClaimedDay !== t) {
-            claimed = {};
+          const nextStep = s.tutorialStep + 1;
+          if (nextStep >= 6) {
+            return { tutorialStep: nextStep, tutorialCompleted: true };
           }
-          if (claimed[taskId]) return s;
-          const prog = s.taskProgress[taskId] ?? 0;
-          if (prog < def.target) return s;
-          const reward = Math.floor(def.reward * s.taskRewardMultiplier);
-          let mult = s.taskRewardMultiplier;
-          if (mult > 1) mult = 1;
-          const stats = { ...s.stats };
-          stats.taskCompletedCount += 1;
-          const ach = { ...s.achievements };
-          if (stats.taskCompletedCount >= 100) ach.a_task_master = true;
-          
-          let currentActive = { ...s.dailyActive };
-          if (currentActive.date !== t) {
-            currentActive = { date: t, points: 0, claimed: {} };
+          return { tutorialStep: nextStep };
+        });
+      },
+
+      skipTutorial: () => {
+        set({ tutorialCompleted: true, tutorialStep: 6 });
+      },
+
+      toggleCloudSave: () => {
+        set((s) => ({ cloudSaveEnabled: !s.cloudSaveEnabled }));
+      },
+
+      setUsername: (name: string) => {
+        set({ username: name.trim(), usernameSet: true });
+      },
+
+      purchaseFromAchievementShop: (itemId: string) => {
+        const item = ACHIEVEMENT_SHOP_ITEMS.find((i) => i.id === itemId);
+        if (!item) return { success: false, error: "商品不存在" };
+
+        const state = get();
+        const currentPoints = state.achievementPoints();
+
+        if (currentPoints < item.cost) {
+          return { success: false, error: "成就点数不足" };
+        }
+
+        set((s) => {
+          let newAchievements = { ...s.achievements };
+          let pointsToSpend = item.cost;
+          const achievementList = [...ACHIEVEMENTS].sort((a, b) => b.points - a.points);
+
+          for (const ach of achievementList) {
+            if (pointsToSpend <= 0) break;
+            if (newAchievements[ach.id]) {
+              if (ach.points <= pointsToSpend) {
+                delete newAchievements[ach.id];
+                pointsToSpend -= ach.points;
+              }
+            }
           }
-          currentActive.points += 20;
-          
+
+          let newCoins = s.coins;
+          let newFreePulls = s.freePulls;
+
+          if (item.type === "coins") {
+            newCoins += item.value;
+          } else if (item.type === "freePulls") {
+            newFreePulls += item.value;
+          }
+
           return {
             ...s,
-            coins: s.coins + reward,
-            taskClaimedDay: t,
-            taskClaimed: { ...claimed, [taskId]: true },
-            taskRewardMultiplier: mult,
-            stats,
-            achievements: ach,
-            dailyActive: currentActive,
+            achievements: newAchievements,
+            coins: newCoins,
+            freePulls: newFreePulls,
+            achievementShopPurchased: {
+              ...s.achievementShopPurchased,
+              [itemId]: (s.achievementShopPurchased[itemId] || 0) + 1,
+            },
           };
         });
+
+        return { success: true };
+      },
+
+      useDailyPrivilege: (privilegeId: string) => {
+        const privilege = DAILY_PRIVILEGES.find((p) => p.id === privilegeId);
+        if (!privilege) return { success: false, error: "特权不存在" };
+
+        const state = get();
+        const level = state.achievementLevel();
+        const t = todayKey();
+
+        if (level < privilege.requiredLevel) {
+          return { success: false, error: `需要成就等级 ${privilege.requiredLevel}` };
+        }
+
+        let usage = state.dailyPrivilegeUsage;
+        if (usage.date !== t) {
+          usage = { date: t, used: {} };
+        }
+
+        if (usage.used[privilegeId]) {
+          return { success: false, error: "今日已使用该特权" };
+        }
+
+        set((s) => {
+          let newCoins = s.coins;
+          let newFreePulls = s.freePulls;
+          let newPullsSinceSSR = s.pullsSinceSSR;
+
+          if (privilegeId === "priv_free_pull") {
+            newFreePulls += 1;
+          } else if (privilegeId === "priv_extra_coins") {
+            newCoins += 50;
+          } else if (privilegeId === "priv_pity_buff") {
+            newPullsSinceSSR = Math.max(0, newPullsSinceSSR - 5);
+          }
+
+          return {
+            ...s,
+            coins: newCoins,
+            freePulls: newFreePulls,
+            pullsSinceSSR: newPullsSinceSSR,
+            dailyPrivilegeUsage: {
+              ...usage,
+              used: { ...usage.used, [privilegeId]: true },
+            },
+          };
+        });
+
+        return { success: true };
+      },
+
+      getCurrentMultiplier: (type: "coins" | "task") => {
+        const activity = getCurrentWeekendActivity();
+        if (!activity) return 1;
+
+        if (type === "coins" && activity.type === "double_coins") {
+          return activity.multiplier;
+        }
+        if (type === "task" && activity.type === "double_task") {
+          return activity.multiplier;
+        }
+        return 1;
+      },
+
+      createDeck: (name: string) => {
+        const deckId = "deck_" + Date.now();
+        set((s) => ({
+          ...s,
+          decks: {
+            ...s.decks,
+            [deckId]: {
+              id: deckId,
+              name: name.trim(),
+              cardIds: [],
+            },
+          },
+        }));
+        return { success: true, deckId };
+      },
+
+      deleteDeck: (deckId: string) => {
+        const state = get();
+        if (!state.decks[deckId]) {
+          return { success: false, error: "卡组不存在" };
+        }
+        set((s) => {
+          const newDecks = { ...s.decks };
+          delete newDecks[deckId];
+          return {
+            ...s,
+            decks: newDecks,
+            activeDeck: s.activeDeck === deckId ? null : s.activeDeck,
+          };
+        });
+        return { success: true };
+      },
+
+      addCardToDeck: (deckId: string, cardId: string) => {
+        const state = get();
+        const deck = state.decks[deckId];
+        if (!deck) {
+          return { success: false, error: "卡组不存在" };
+        }
+        if ((state.inventory[cardId] ?? 0) <= 0) {
+          return { success: false, error: "未拥有该卡牌" };
+        }
+        if (deck.cardIds.length >= 5) {
+          return { success: false, error: "卡组最多 5 张卡牌" };
+        }
+        if (deck.cardIds.includes(cardId)) {
+          return { success: false, error: "已在卡组中" };
+        }
+        set((s) => ({
+          ...s,
+          decks: {
+            ...s.decks,
+            [deckId]: {
+              ...deck,
+              cardIds: [...deck.cardIds, cardId],
+            },
+          },
+        }));
+        return { success: true };
+      },
+
+      removeCardFromDeck: (deckId: string, cardId: string) => {
+        const state = get();
+        const deck = state.decks[deckId];
+        if (!deck) {
+          return { success: false, error: "卡组不存在" };
+        }
+        set((s) => ({
+          ...s,
+          decks: {
+            ...s.decks,
+            [deckId]: {
+              ...deck,
+              cardIds: deck.cardIds.filter((id: string) => id !== cardId),
+            },
+          },
+        }));
+        return { success: true };
+      },
+
+      setActiveDeck: (deckId: string | null) => {
+        set({ activeDeck: deckId });
+      },
+
+      upgradeCard: (cardId: string) => {
+        const state = get();
+        if ((state.inventory[cardId] ?? 0) <= 0) {
+          return { success: false, error: "未拥有该卡牌" };
+        }
+        const currentLevel = state.cardLevels[cardId] ?? 1;
+        if (currentLevel >= 10) {
+          return { success: false, error: "已达到最高等级" };
+        }
+        const cost = currentLevel * 100;
+        if (state.coins < cost) {
+          return { success: false, error: "灵石不足" };
+        }
+        set((s) => ({
+          ...s,
+          coins: s.coins - cost,
+          cardLevels: {
+            ...s.cardLevels,
+            [cardId]: currentLevel + 1,
+          },
+        }));
+        return { success: true };
+      },
+
+      getDeckCardSkills: () => {
+        const state = get();
+        const skills: CardSkill[] = [];
+        if (!state.activeDeck) return skills;
+        
+        const deck = state.decks[state.activeDeck];
+        if (!deck) return skills;
+        
+        deck.cardIds.forEach((cardId: string) => {
+          const card = state.cardById(cardId);
+          if (!card) return;
+          
+          const level = state.cardLevels[cardId] ?? 1;
+          const breakthrough = state.cardBreakthroughs[cardId] ?? 0;
+          let bonusMultiplier = 1;
+          if (breakthrough >= 1) bonusMultiplier += 0.1;
+          if (breakthrough >= 2) bonusMultiplier += 0.1;
+          if (breakthrough >= 3) bonusMultiplier += 0.15;
+          
+          if (card.rarity === "SSR") {
+            skills.push({
+              id: `skill_${cardId}`,
+              name: `${card.name}的祝福`,
+              description: "SSR 卡牌技能：略微提升运气",
+              effect: "increase_luck",
+              value: Math.floor((5 + level * 2) * bonusMultiplier),
+            });
+          } else if (card.rarity === "SR") {
+            skills.push({
+              id: `skill_${cardId}`,
+              name: `${card.name}的庇佑`,
+              description: "SR 卡牌技能：减少保底进度",
+              effect: "decrease_pity",
+              value: Math.floor(Math.floor(level / 2) * bonusMultiplier),
+            });
+          }
+        });
+        return skills;
+      },
+
+      breakthroughCard: (cardId: string) => {
+        const state = get();
+        const owned = state.inventory[cardId] ?? 0;
+        if (owned <= 0) return { success: false, error: "未拥有该卡牌" };
+        
+        const currentLevel = state.cardBreakthroughs[cardId] ?? 0;
+        if (currentLevel >= BREAKTHROUGH_LEVELS.length) {
+          return { success: false, error: "已达到最高突破等级" };
+        }
+        
+        const req = BREAKTHROUGH_LEVELS[currentLevel]!;
+        if (owned < req.requiredCards) {
+          return { success: false, error: `需要 ${req.requiredCards} 张相同卡牌` };
+        }
+        if (state.coins < req.requiredCoins) {
+          return { success: false, error: "灵石不足" };
+        }
+        
+        set((s) => ({
+          ...s,
+          coins: s.coins - req.requiredCoins,
+          inventory: { ...s.inventory, [cardId]: owned - req.requiredCards + 1 },
+          cardBreakthroughs: { ...s.cardBreakthroughs, [cardId]: currentLevel + 1 },
+        }));
+        
+        get().triggerRewardAnimation("level", currentLevel + 1);
+        
+        return { success: true };
+      },
+
+      getElementAdvantage: (element: Element) => {
+        return ELEMENT_ADVANTAGE[element] || { strong: [], weak: [] };
+      },
+
+      getSetBonuses: () => {
+        const state = get();
+        const result: Array<{ setName: string; bonus: string; effect: string; value: number }> = [];
+        const inventory = state.inventory;
+        
+        for (const set of CARD_SETS) {
+          const ownedCount = set.cardIds.filter((id) => (inventory[id] ?? 0) > 0).length;
+          for (const bonus of set.bonuses) {
+            if (ownedCount >= bonus.count) {
+              result.push({
+                setName: set.name,
+                bonus: bonus.description,
+                effect: bonus.effect,
+                value: bonus.value,
+              });
+            }
+          }
+        }
+        
+        return result;
+      },
+
+      triggerRewardAnimation: (type: "coins" | "card" | "achievement" | "level", amount: number) => {
+        set({ rewardAnimation: { visible: true, type, amount } });
+      },
+
+      dismissRewardAnimation: () => {
+        set({ rewardAnimation: null });
+      },
+
+      saveToCloud: async () => {
+        try {
+          const { hasSupabase } = await import("../backend/supabaseClient");
+          if (!hasSupabase()) {
+            return { success: false, error: "Supabase 未配置，请检查环境变量" };
+          }
+
+          const { getOrCreateUserId } = await import("../backend/userId");
+          const { saveGameSave, syncInventoryToCloud } = await import("../backend/api");
+          const userId = getOrCreateUserId();
+          const state = get();
+
+          const saveData = {
+            saveVersion: state.saveVersion,
+            coins: state.coins,
+            activePoolId: state.activePoolId,
+            ssrUpGuarantee: state.ssrUpGuarantee,
+            fatePoints: state.fatePoints,
+            pullsSinceSR: state.pullsSinceSR,
+            pullsSinceSSR: state.pullsSinceSSR,
+            totalPulls: state.totalPulls,
+            inventory: state.inventory,
+            lastLoginDate: state.lastLoginDate,
+            streak: state.streak,
+            dailyFortuneDate: state.dailyFortuneDate,
+            dailyFortune: state.dailyFortune,
+            threeCardIds: state.threeCardIds,
+            wheelDate: state.wheelDate,
+            wheelBuff: state.wheelBuff,
+            taskRewardMultiplier: state.taskRewardMultiplier,
+            freePulls: state.freePulls,
+            calmFortune: state.calmFortune,
+            taskProgress: state.taskProgress,
+            taskClaimedDay: state.taskClaimedDay,
+            taskClaimed: state.taskClaimed,
+            weeklyTaskProgress: state.weeklyTaskProgress,
+            weeklyTaskClaimedWeek: state.weeklyTaskClaimedWeek,
+            weeklyTaskClaimed: state.weeklyTaskClaimed,
+            collectionRewardsClaimed: state.collectionRewardsClaimed,
+            achievementLevelRewardsClaimed: state.achievementLevelRewardsClaimed,
+            dailyActive: state.dailyActive,
+            achievements: state.achievements,
+            history: state.history,
+            settings: state.settings,
+            stats: state.stats,
+            checkInDate: state.checkInDate,
+            checkInStreak: state.checkInStreak,
+            totalCheckIns: state.totalCheckIns,
+            tutorialStep: state.tutorialStep,
+            tutorialCompleted: state.tutorialCompleted,
+          };
+
+          await saveGameSave(userId, saveData);
+          await syncInventoryToCloud(userId, state.inventory);
+
+          set({
+            cloudLastSavedAt: new Date().toISOString(),
+          });
+
+          return { success: true };
+        } catch (error) {
+          console.error("保存到云端失败:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "未知错误",
+          };
+        }
+      },
+
+      loadFromCloud: async () => {
+        try {
+          const { hasSupabase } = await import("../backend/supabaseClient");
+          if (!hasSupabase()) {
+            return { success: false, error: "Supabase 未配置，请检查环境变量" };
+          }
+
+          const { getOrCreateUserId } = await import("../backend/userId");
+          const { fetchGameSave } = await import("../backend/api");
+          const userId = getOrCreateUserId();
+
+          const cloudSave = await fetchGameSave(userId);
+
+          if (!cloudSave) {
+            return { success: true, hasData: false };
+          }
+
+          set((s) => ({
+            ...s,
+            ...cloudSave.save_data,
+            cloudLastSyncedAt: new Date().toISOString(),
+          }));
+
+          return { success: true, hasData: true };
+        } catch (error) {
+          console.error("从云端加载失败:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "未知错误",
+            hasData: false,
+          };
+        }
       },
     }),
     {
@@ -991,8 +1678,6 @@ export const useGameStore = create<GameState>()(
       onRehydrateStorage: () => () => {
         queueMicrotask(() => {
           useGameStore.getState().tickDailyLogin();
-          const s = useGameStore.getState();
-          if (s.coins < 50000) useGameStore.setState({ coins: 50000 });
         });
       },
       partialize: (s) => ({
@@ -1031,6 +1716,18 @@ export const useGameStore = create<GameState>()(
         checkInDate: s.checkInDate,
         checkInStreak: s.checkInStreak,
         totalCheckIns: s.totalCheckIns,
+        tutorialStep: s.tutorialStep,
+        tutorialCompleted: s.tutorialCompleted,
+        cloudSaveEnabled: s.cloudSaveEnabled,
+        cloudLastSavedAt: s.cloudLastSavedAt,
+        cloudLastSyncedAt: s.cloudLastSyncedAt,
+        username: s.username,
+        usernameSet: s.usernameSet,
+        achievementShopPurchased: s.achievementShopPurchased,
+        dailyPrivilegeUsage: s.dailyPrivilegeUsage,
+        activeDeck: s.activeDeck,
+        decks: s.decks,
+        cardLevels: s.cardLevels,
       }),
     }
   )

@@ -9,6 +9,8 @@ import {
   weekKey,
   CARDS,
   DAILY_ACTIVE_REWARDS,
+  ACHIEVEMENT_SHOP_ITEMS,
+  DAILY_PRIVILEGES,
 } from "./store/gameStore";
 import type { TabId } from "./types";
 import { threeCardNarrative } from "./features/divination/fortuneTemplates";
@@ -38,6 +40,195 @@ function rarityTierClass(r: string): string {
   return "tier-n";
 }
 
+function Tutorial() {
+  const tutorialStep = useGameStore((s) => s.tutorialStep);
+  const tutorialCompleted = useGameStore((s) => s.tutorialCompleted);
+  const advanceTutorial = useGameStore((s) => s.advanceTutorial);
+  const skipTutorial = useGameStore((s) => s.skipTutorial);
+  const checkIn = useGameStore((s) => s.checkIn);
+  const checkInDate = useGameStore((s) => s.checkInDate);
+  const username = useGameStore((s) => s.username);
+  const t = todayKey();
+
+  if (tutorialCompleted) return null;
+
+  const tutorialSteps = [
+    {
+      title: `欢迎${username ? `，${username}` : "来到阴阳寮"}`,
+      content: "让我带你熟悉一下游戏的基本操作吧！",
+      buttonText: "好的",
+      highlight: null,
+    },
+    {
+      title: "每日签到",
+      content: "点击下方的「立即签到」按钮，领取今日的灵石奖励！连续签到还有额外加成哦～",
+      buttonText: "继续",
+      highlight: "checkin-button",
+      action: () => {
+        if (checkInDate !== t) checkIn();
+      },
+    },
+    {
+      title: "抽卡祈愿",
+      content: "点击「祈愿」tab，试试你的手气！单抽10灵石，十连80灵石更划算～",
+      buttonText: "继续",
+      highlight: "tab-gacha",
+    },
+    {
+      title: "试试抽卡",
+      content: "点击「单抽」或「十连」按钮，看看你能抽到什么式神！",
+      buttonText: "继续",
+      highlight: "gacha-ten",
+    },
+    {
+      title: "每日运势",
+      content: "点击「占卜」tab，查看今日运势，还能抽三牌阵了解运程哦～",
+      buttonText: "继续",
+      highlight: "tab-fortune",
+    },
+    {
+      title: "准备就绪！",
+      content: "太棒了！你已经掌握了基本玩法，现在开始你的阴阳寮之旅吧！",
+      buttonText: "开启旅程",
+      highlight: null,
+    },
+  ];
+
+  const currentStep = tutorialSteps[tutorialStep];
+  if (!currentStep) return null;
+
+  const handleClick = () => {
+    if (currentStep.action) {
+      currentStep.action();
+    }
+    advanceTutorial();
+  };
+
+  return (
+    <>
+      <div className="modal-backdrop" role="dialog" aria-modal="true" style={{ background: "transparent", pointerEvents: "none" }}>
+        <div className="modal tutorial-modal" style={{ pointerEvents: "auto" }}>
+          <div className="tutorial-progress">
+            {tutorialSteps.map((_, i) => (
+              <div
+                key={i}
+                className={`tutorial-dot ${i <= tutorialStep ? "active" : ""}`}
+              />
+            ))}
+          </div>
+          <h2 className="tutorial-title">{currentStep.title}</h2>
+          <p className="tutorial-content">{currentStep.content}</p>
+          <div className="tutorial-buttons">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={skipTutorial}
+            >
+              跳过
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleClick}
+            >
+              {currentStep.buttonText}
+            </button>
+          </div>
+        </div>
+      </div>
+      {currentStep.highlight && <HighlightOverlay target={currentStep.highlight} />}
+    </>
+  );
+}
+
+function HighlightOverlay({ target }: { target: string }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    const updateRect = () => {
+      const el = document.querySelector(`[data-highlight-target="${target}"]`);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setRect(new DOMRect(
+          r.left - 8,
+          r.top - 8,
+          r.width + 16,
+          r.height + 16
+        ));
+      } else {
+        setRect(null);
+      }
+    };
+
+    updateRect();
+    const observer = new MutationObserver(updateRect);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect);
+    };
+  }, [target]);
+
+  if (!rect) return null;
+
+  const path = `
+    M 0 0
+    H ${window.innerWidth}
+    V ${window.innerHeight}
+    H 0
+    Z
+    M ${rect.left} ${rect.top}
+    h ${rect.width}
+    v ${rect.height}
+    h -${rect.width}
+    Z
+  `;
+
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      pointerEvents: "none",
+    }}>
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <path
+          d={path}
+          fill="rgba(0,0,0,0.7)"
+          style={{ pointerEvents: "auto" }}
+        />
+      </svg>
+      <div style={{
+        position: "absolute",
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        border: "3px solid #ffd700",
+        borderRadius: "12px",
+        boxShadow: "0 0 30px rgba(255, 215, 0, 0.6), inset 0 0 20px rgba(255, 215, 0, 0.3)",
+        animation: "pulse 1s ease-in-out infinite",
+        pointerEvents: "auto",
+      }}>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6), inset 0 0 20px rgba(255, 215, 0, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.9), inset 0 0 30px rgba(255, 215, 0, 0.5);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function PullModal({
   results,
   onClose,
@@ -46,7 +237,11 @@ function PullModal({
   onClose: () => void;
 }) {
   const [active, setActive] = useState(0);
+  const [sharing, setSharing] = useState(false);
   const artCacheRef = useRef<Map<string, string>>(new Map());
+  const activePoolId = useGameStore((s) => s.activePoolId);
+  const pools = poolsJson as PoolDef[];
+  const activePool = pools.find((p: PoolDef) => p.id === activePoolId) ?? pools[0];
 
   const getArt = (r: PullResult) => {
     const id = r.card.id;
@@ -63,6 +258,41 @@ function PullModal({
       });
     artCacheRef.current.set(id, url);
     return url;
+  };
+
+  const handleShare = async () => {
+    setSharing(true);
+    try {
+      const { shareContent } = await import("./utils/share");
+      const shareData = {
+        title: `🎴 天机抽卡 - ${activePool.name}`,
+        text: (() => {
+          const ssrCount = results.filter((r) => r.rarity === "SSR").length;
+          const srCount = results.filter((r) => r.rarity === "SR").length;
+
+          let resultText = "";
+          if (results.length === 1) {
+            resultText = `抽到了「${results[0].card.name}」(${results[0].rarity})！`;
+          } else {
+            resultText = `获得 ${ssrCount} 张 SSR，${srCount} 张 SR！`;
+            if (results.length > 0) {
+              const topCards = results.slice(0, 3).map((r) => r.card.name).join("、");
+              resultText += ` 包含：${topCards}${results.length > 3 ? "…" : ""}`;
+            }
+          }
+
+          return `【${activePool.name}】
+${resultText}
+
+来「天机抽卡」一起探索命运吧！`;
+        })(),
+      };
+      await shareContent(shareData);
+    } catch (error) {
+      console.error("分享失败:", error);
+    } finally {
+      setSharing(false);
+    }
   };
 
   const cur = results[active];
@@ -150,6 +380,9 @@ function PullModal({
         </div>
 
         <div className="btn-row" style={{ marginTop: "1rem" }}>
+          <button type="button" className="btn btn-paper" onClick={handleShare} disabled={sharing}>
+            {sharing ? "分享中…" : "🔗 分享"}
+          </button>
           <button type="button" className="btn btn-primary" onClick={onClose}>
             收下
           </button>
@@ -461,6 +694,200 @@ function HistoryModal({
   );
 }
 
+function UsernameModal() {
+  const usernameSet = useGameStore((s) => s.usernameSet);
+  const setUsername = useGameStore((s) => s.setUsername);
+  const [inputValue, setInputValue] = useState("");
+
+  if (usernameSet) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputValue.trim().length >= 1 && inputValue.trim().length <= 20) {
+      setUsername(inputValue.trim());
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal">
+        <h2 style={{ marginTop: 0, textAlign: "center" }}>欢迎来到阴阳寮</h2>
+        <p className="hint" style={{ textAlign: "center", marginBottom: "1.25rem" }}>
+          请取一个名字，开启你的占卜之旅！
+        </p>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="输入你的名字（1-20个字符）"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            maxLength={20}
+            style={{
+              width: "100%",
+              padding: "0.75rem 1rem",
+              fontSize: "1rem",
+              borderRadius: "0.5rem",
+              border: "2px solid var(--border)",
+              background: "var(--bg)",
+              color: "var(--text)",
+              marginBottom: "1rem",
+            }}
+            autoFocus
+          />
+          <div className="btn-row">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={inputValue.trim().length < 1}
+            >
+              确认
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RewardAnimation({
+  animation,
+  onDismiss,
+}: {
+  animation: { visible: boolean; type: "coins" | "card" | "achievement" | "level"; amount: number };
+  onDismiss: () => void;
+}) {
+  const [show, setShow] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShow(false);
+      setTimeout(onDismiss, 500);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  const confettiPieces = Array.from({ length: 50 }, (_, i) => i);
+
+  const getAnimationContent = () => {
+    switch (animation.type) {
+      case "coins":
+        return (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>💰</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#d8b25d" }}>
+              +{animation.amount} 灵石
+            </div>
+          </>
+        );
+      case "card":
+        return (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>🎴</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#9370db" }}>
+              获得卡牌！
+            </div>
+          </>
+        );
+      case "achievement":
+        return (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>🏆</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ff6b6b" }}>
+              成就解锁！
+            </div>
+          </>
+        );
+      case "level":
+        return (
+          <>
+            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>⭐</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#4ecdc4" }}>
+              等级提升！
+            </div>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!show && animation.visible) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: 9999,
+      }}
+    >
+      {confettiPieces.map((i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            width: "8px",
+            height: "8px",
+            backgroundColor: ["#ff6b6b", "#4ecdc4", "#ffe66d", "#9370db", "#667eea"][i % 5],
+            borderRadius: i % 2 === 0 ? "50%" : "0",
+            animation: `confettiFall 2.5s ease-out forwards`,
+            animationDelay: `${i * 0.03}s`,
+            left: `${Math.random() * 100}%`,
+            top: "-20px",
+          }}
+        />
+      ))}
+
+      <div
+        style={{
+          background: "linear-gradient(135deg, rgba(216,178,93,0.95), rgba(147,112,219,0.95))",
+          padding: "2rem 3rem",
+          borderRadius: "1.5rem",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+          textAlign: "center",
+          animation: "rewardPopIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards",
+          border: "3px solid rgba(255,255,255,0.3)",
+        }}
+      >
+        {getAnimationContent()}
+      </div>
+
+      <style>{`
+        @keyframes confettiFall {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+        @keyframes rewardPopIn {
+          0% {
+            transform: scale(0) rotate(-10deg);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.1) rotate(2deg);
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState<TabId>("home");
   const [gachaOpen, setGachaOpen] = useState(false);
@@ -495,6 +922,20 @@ export default function App() {
   const activePoolId = useGameStore((s) => s.activePoolId);
   const setActivePoolId = useGameStore((s) => s.setActivePoolId);
   const fatePoints = useGameStore((s) => s.fatePoints);
+  const username = useGameStore((s) => s.username);
+  const tutorialStep = useGameStore((s) => s.tutorialStep);
+  const tutorialCompleted = useGameStore((s) => s.tutorialCompleted);
+  const rewardAnimation = useGameStore((s) => s.rewardAnimation);
+  const dismissRewardAnimation = useGameStore((s) => s.dismissRewardAnimation);
+
+  useEffect(() => {
+    if (tutorialCompleted) return;
+    if (tutorialStep === 1) setTab("progress");
+    else if (tutorialStep === 2) setTab("gacha");
+    else if (tutorialStep === 3) setTab("gacha");
+    else if (tutorialStep === 4) setTab("fortune");
+    else setTab("home");
+  }, [tutorialStep, tutorialCompleted]);
 
   const t = todayKey();
   const currentRevealCard = pendingReveal?.[revealIndex]?.card ?? null;
@@ -548,9 +989,20 @@ export default function App() {
           </div>
           <div>
             <h1 className="brand-title">✨ 天机抽卡 ✨</h1>
-            <p className="sub">算命 · 占卜 · 抽卡 · 本地存档（纯前端）</p>
+            <p className="sub">
+              {username ? `${username} · ` : ""}算命 · 占卜 · 抽卡 · 本地存档（纯前端）
+            </p>
           </div>
         </div>
+        {username && (
+          <div className="pill" style={{ 
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+            fontWeight: 600
+          }}>
+            👤 {username}
+          </div>
+        )}
       </header>
 
       <div className="stat-bar">
@@ -600,19 +1052,19 @@ export default function App() {
                 <div 
                   className="guarantee-fill ssr" 
                   style={{ 
-                    width: `${(pullsSinceSSR / 60) * 100}%`,
-                    filter: pullsSinceSSR >= 45 ? "brightness(1.3)" : "none"
+                    width: `${(pullsSinceSSR / 50) * 100}%`,
+                    filter: pullsSinceSSR >= 35 ? "brightness(1.3)" : "none"
                   }} 
                 />
               </div>
               <span 
                 className={`guarantee-count ssr`}
                 style={{ 
-                  color: pullsSinceSSR >= 45 ? "#ff6b6b" : "inherit",
-                  fontWeight: pullsSinceSSR >= 45 ? 800 : 600
+                  color: pullsSinceSSR >= 35 ? "#ff6b6b" : "inherit",
+                  fontWeight: pullsSinceSSR >= 35 ? 800 : 600
                 }}
               >
-                {60 - pullsSinceSSR}/60
+                {50 - pullsSinceSSR}/50
               </span>
             </div>
             <div style={{ 
@@ -620,7 +1072,7 @@ export default function App() {
               color: "var(--muted)", 
               marginTop: "0.2rem" 
             }}>
-              {pullsSinceSSR >= 45 ? "即将保底！" : `进度 ${Math.round((pullsSinceSSR / 60) * 100)}%`}
+              {pullsSinceSSR >= 35 ? "即将保底！" : `进度 ${Math.round((pullsSinceSSR / 50) * 100)}%`}
             </div>
           </div>
         </div>
@@ -639,6 +1091,7 @@ export default function App() {
             key={it.id}
             type="button"
             className={`tab-btn ${tab === it.id ? "active" : ""}`}
+            data-highlight-target={`tab-${it.id}`}
             onClick={() => {
               if (soundOn && tab !== it.id) void playSfx("click", 0.5);
               setTab(it.id);
@@ -817,6 +1270,16 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      <UsernameModal />
+      <Tutorial />
+      
+      {rewardAnimation && rewardAnimation.visible && (
+        <RewardAnimation 
+          animation={rewardAnimation} 
+          onDismiss={dismissRewardAnimation} 
+        />
       )}
     </div>
   );
@@ -1060,7 +1523,7 @@ function HomeTab() {
         icon: "须",
         tag: "须知",
         title: "祈愿消耗",
-        meta: "单抽 10 · 十连 90",
+        meta: "单抽 10 · 十连 80",
         body: "灵石不足时可先做任务与成就，或等轮盘的加成。",
       },
       {
@@ -1068,7 +1531,7 @@ function HomeTab() {
         icon: "规",
         tag: "规则",
         title: "保底机制",
-        meta: "10 抽 SR+ · 60 抽 SSR",
+        meta: "10 抽 SR+ · 50 抽 SSR",
         body: "限定池存在 UP 与保底逻辑；抽卡页会显示距离保底的剩余抽数。",
       },
       {
@@ -1164,7 +1627,7 @@ function GachaTab({
   const wheelBuff = useGameStore((s) => s.wheelBuff);
   const soundOn = useGameStore((s) => s.settings.soundOn);
   const wild = wheelBuff?.id === "wild";
-  const tenCost = wild ? 80 : 90;
+  const tenCost = wild ? 70 : 80;
   const currentPool = pools.find((p) => p.id === activePoolId) ?? pools[0]!;
 
   return (
@@ -1216,6 +1679,7 @@ function GachaTab({
               if (soundOn) void playSfx("tap", 0.6);
               onSingle();
             }}
+            data-highlight-target="gacha-single"
           >
             单抽（{freePulls > 0 ? "免费" : "10 灵石"}）
           </button>
@@ -1227,6 +1691,7 @@ function GachaTab({
               if (soundOn) void playSfx("tap", 0.6);
               onTen();
             }}
+            data-highlight-target="gacha-ten"
           >
             {wild ? `十连+1（${tenCost} 灵石）` : `十连（${tenCost} 灵石）`}
           </button>
@@ -1234,7 +1699,7 @@ function GachaTab({
 
         <div className="gacha-footnote">
           {wild
-            ? "轮盘「变数之门」生效：十连 80 灵石并额外抽第 11 张。"
+            ? "轮盘「变数之门」生效：十连 70 灵石并额外抽第 11 张。"
             : "十连更省灵石；轮盘若为 SR/SSR 加成，将提高对应稀有度权重。"}
         </div>
       </div>
@@ -1251,6 +1716,7 @@ function FortuneTab() {
   const wheelDate = useGameStore((s) => s.wheelDate);
   const wheelBuff = useGameStore((s) => s.wheelBuff);
   const cardById = useGameStore((s) => s.cardById);
+  const [sharing, setSharing] = useState(false);
   const t = todayKey();
 
   const threeCards =
@@ -1267,6 +1733,20 @@ function FortuneTab() {
         )
       : null;
 
+  const handleShareFortune = async () => {
+    if (!dailyFortune) return;
+    setSharing(true);
+    try {
+      const { shareContent, formatFortuneShare } = await import("./utils/share");
+      const shareData = formatFortuneShare(dailyFortune);
+      await shareContent(shareData);
+    } catch (error) {
+      console.error("分享失败:", error);
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div>
       <div className="panel">
@@ -1274,7 +1754,7 @@ function FortuneTab() {
         <p className="hint" style={{ marginTop: 0 }}>
           按日生成签文与幸运元素；若轮盘为「心平气和」，可降低极端下签概率。
         </p>
-        <button type="button" className="btn btn-primary" onClick={readDailyFortune}>
+        <button type="button" className="btn btn-primary" onClick={readDailyFortune} data-highlight-target="fortune-generate">
           生成 / 刷新今日运势
         </button>
         {dailyFortune && (
@@ -1293,6 +1773,16 @@ function FortuneTab() {
               <strong>指引：</strong>
               {dailyFortune.advice}
             </p>
+            <div style={{ marginTop: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-paper"
+                onClick={handleShareFortune}
+                disabled={sharing}
+              >
+                {sharing ? "分享中…" : "🔗 分享运势"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1373,6 +1863,10 @@ function ProgressTab() {
   const claimAchievementLevelReward = useGameStore((s) => s.claimAchievementLevelReward);
   const dailyActive = useGameStore((s) => s.dailyActive);
   const claimDailyActiveReward = useGameStore((s) => s.claimDailyActiveReward);
+  const purchaseFromAchievementShop = useGameStore((s) => s.purchaseFromAchievementShop);
+  const useDailyPrivilege = useGameStore((s) => s.useDailyPrivilege);
+  const achievementShopPurchased = useGameStore((s) => s.achievementShopPurchased);
+  const dailyPrivilegeUsage = useGameStore((s) => s.dailyPrivilegeUsage);
   const soundOn = useGameStore((s) => s.settings.soundOn);
   const t = todayKey();
   const wk = weekKey();
@@ -1414,6 +1908,27 @@ function ProgressTab() {
         </div>
       </div>
 
+      {(() => {
+        const now = new Date();
+        const day = now.getDay();
+        const isWeekend = day === 0 || day === 6;
+        if (!isWeekend) return null;
+        return (
+          <div className="scroll-section">
+            <div style={{
+              background: "linear-gradient(135deg, #ff6b6b, #ffd93d)",
+              padding: "1rem",
+              borderRadius: "0.75rem",
+              color: "#2d3436",
+              fontWeight: 700,
+              textAlign: "center"
+            }}>
+              🎉 周末双倍活动进行中！签到和任务奖励翻倍！
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="scroll-section">
         <div className="scroll-section-title">每日签到</div>
         <div className="scroll-list">
@@ -1451,6 +1966,7 @@ function ProgressTab() {
                 className={isCheckedInToday ? "btn btn-paper" : "btn btn-primary"}
                 disabled={isCheckedInToday}
                 onClick={handleCheckIn}
+                data-highlight-target="checkin-button"
               >
                 {isCheckedInToday ? "已签到" : "立即签到"}
               </button>
@@ -1570,6 +2086,113 @@ function ProgressTab() {
                     onClick={handleClaim}
                   >
                     {isClaimed ? "已领取" : isUnlocked ? "领取奖励" : "未解锁"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="scroll-section">
+        <div className="scroll-section-title">每日特权</div>
+        <div className="scroll-list">
+          {DAILY_PRIVILEGES.map((priv) => {
+            const isUnlocked = achievementLevel() >= priv.requiredLevel;
+            const usage = dailyPrivilegeUsage;
+            const isUsed = usage.date === t && usage.used[priv.id];
+
+            const handleUse = () => {
+              if (!isUnlocked || isUsed) return;
+              if (soundOn) void playSfx("success", 0.7);
+              const result = useDailyPrivilege(priv.id);
+              if (result.success && (priv.id === "priv_free_pull" || priv.id === "priv_extra_coins")) {
+                setLastReward(priv.id === "priv_extra_coins" ? 50 : 1);
+                setCheckInAnimation(true);
+                setTimeout(() => setCheckInAnimation(false), 2000);
+              }
+            };
+
+            return (
+              <div key={priv.id} className={`task-card ${isUsed ? "claimed" : ""}`}>
+                <div className="task-ico" aria-hidden>
+                  权
+                </div>
+                <div className="task-main">
+                  <div className="task-row1">
+                    <div className="task-title">{priv.title}</div>
+                    <div className="task-meta">
+                      Lv.{priv.requiredLevel}
+                    </div>
+                  </div>
+                  <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                    {priv.description}
+                  </div>
+                </div>
+                <div className="task-side">
+                  <button
+                    type="button"
+                    className={isUnlocked && !isUsed ? "btn btn-primary" : "btn btn-paper"}
+                    disabled={!isUnlocked || isUsed}
+                    onClick={handleUse}
+                  >
+                    {isUsed ? "今日已用" : isUnlocked ? "立即使用" : "未解锁"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="scroll-section">
+        <div className="scroll-section-title">成就商店</div>
+        <div className="scroll-list">
+          {ACHIEVEMENT_SHOP_ITEMS.map((item) => {
+            const canAfford = achievementPoints() >= item.cost;
+            const purchased = achievementShopPurchased[item.id] || 0;
+
+            const handlePurchase = () => {
+              if (!canAfford) return;
+              if (soundOn) void playSfx("reward", 0.7);
+              const result = purchaseFromAchievementShop(item.id);
+              if (result.success) {
+                setLastReward(item.value);
+                setCheckInAnimation(true);
+                setTimeout(() => setCheckInAnimation(false), 2000);
+              }
+            };
+
+            return (
+              <div key={item.id} className="task-card">
+                <div className="task-ico" aria-hidden>
+                  商
+                </div>
+                <div className="task-main">
+                  <div className="task-row1">
+                    <div className="task-title">{item.title}</div>
+                    <div className="task-meta">
+                      {purchased} 次兑换
+                    </div>
+                  </div>
+                  <div className="task-row2" style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                    {item.description}
+                  </div>
+                </div>
+                <div className="task-side">
+                  <div className="task-reward">
+                    <span className="reward-ico" aria-hidden>
+                      点
+                    </span>
+                    <span className="reward-num">{item.cost}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={canAfford ? "btn btn-primary" : "btn btn-paper"}
+                    disabled={!canAfford}
+                    onClick={handlePurchase}
+                  >
+                    兑换
                   </button>
                 </div>
               </div>
@@ -1906,12 +2529,25 @@ function ProgressTab() {
 
 function CollectionTab() {
   const inventory = useGameStore((s) => s.inventory);
+  const decks = useGameStore((s) => s.decks);
+  const activeDeck = useGameStore((s) => s.activeDeck);
+  const createDeck = useGameStore((s) => s.createDeck);
+  const deleteDeck = useGameStore((s) => s.deleteDeck);
+  const addCardToDeck = useGameStore((s) => s.addCardToDeck);
+  const removeCardFromDeck = useGameStore((s) => s.removeCardFromDeck);
+  const setActiveDeck = useGameStore((s) => s.setActiveDeck);
+  const getDeckCardSkills = useGameStore((s) => s.getDeckCardSkills);
+  
   const [rarity, setRarity] = useState<"ALL" | "SSR" | "SR" | "R" | "N">("ALL");
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [missingOnly, setMissingOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"rarity" | "name">("rarity");
   const [search, setSearch] = useState("");
   const [selectedCard, setSelectedCard] = useState<(typeof CARDS)[number] | null>(null);
+  const [newDeckName, setNewDeckName] = useState("");
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [showDeckManager, setShowDeckManager] = useState(false);
+  
   const rarityD = useDeferredValue(rarity);
   const ownedOnlyD = useDeferredValue(ownedOnly);
   const missingOnlyD = useDeferredValue(missingOnly);
@@ -1926,6 +2562,37 @@ function CollectionTab() {
     setMissingOnly(false);
     setSortBy("rarity");
     setSearch("");
+  };
+
+  const handleCreateDeck = () => {
+    if (newDeckName.trim()) {
+      const result = createDeck(newDeckName);
+      if (result.success) {
+        setNewDeckName("");
+        setSelectedDeckId(result.deckId);
+      }
+    }
+  };
+
+  const handleDeleteDeck = (deckId: string) => {
+    if (confirm("确定要删除这个卡组吗？")) {
+      deleteDeck(deckId);
+      if (selectedDeckId === deckId) {
+        setSelectedDeckId(null);
+      }
+    }
+  };
+
+  const handleToggleCardInDeck = (cardId: string) => {
+    if (!selectedDeckId) return;
+    const deck = decks[selectedDeckId];
+    if (!deck) return;
+    
+    if (deck.cardIds.includes(cardId)) {
+      removeCardFromDeck(selectedDeckId, cardId);
+    } else {
+      addCardToDeck(selectedDeckId, cardId);
+    }
   };
 
   const getArt = (c: (typeof CARDS)[number]) => {
@@ -1988,6 +2655,9 @@ function CollectionTab() {
       });
   }, [inventory, ownedOnlyD, missingOnlyD, rarityD, artRev, sortByD, searchD]);
 
+  const deckList = Object.values(decks);
+  const currentSkills = getDeckCardSkills();
+
   return (
     <div className="panel scroll-panel">
       <div className="scroll-banner scroll-banner-book" aria-hidden />
@@ -1998,6 +2668,188 @@ function CollectionTab() {
         <div className="progressbar" aria-hidden style={{ marginTop: "0.6rem" }}>
           <div className="progressbar-fill" style={{ width: `${ratio * 100}%` }} />
         </div>
+      </div>
+
+      <div style={{ 
+        marginBottom: "1rem", 
+        padding: "0.8rem",
+        background: "var(--bg-2)",
+        borderRadius: "0.6rem",
+        border: "1px solid var(--border)"
+      }}>
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center",
+          marginBottom: "0.6rem"
+        }}>
+          <span style={{ fontWeight: 700, color: "var(--text)" }}>卡组管理</span>
+          <button
+            type="button"
+            className="btn btn-paper"
+            onClick={() => setShowDeckManager(!showDeckManager)}
+          >
+            {showDeckManager ? "收起" : "展开"}
+          </button>
+        </div>
+        
+        {showDeckManager && (
+          <>
+            <div style={{ 
+              display: "flex", 
+              gap: "0.6rem", 
+              marginBottom: "0.8rem",
+              alignItems: "center"
+            }}>
+              <input
+                type="text"
+                value={newDeckName}
+                onChange={(e) => setNewDeckName(e.target.value)}
+                placeholder="输入新卡组名称"
+                style={{ 
+                  flex: 1,
+                  padding: "0.6rem 0.8rem",
+                  borderRadius: "0.5rem",
+                  border: "2px solid var(--border)",
+                  background: "var(--bg)",
+                  color: "var(--text)"
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateDeck}
+                disabled={!newDeckName.trim()}
+              >
+                创建卡组
+              </button>
+            </div>
+
+            {deckList.length > 0 && (
+              <div style={{ marginBottom: "0.8rem" }}>
+                <div style={{ 
+                  fontSize: "0.85rem", 
+                  color: "var(--muted)", 
+                  marginBottom: "0.4rem" 
+                }}>
+                  选择卡组进行编辑：
+                </div>
+                <div style={{ 
+                  display: "flex", 
+                  flexWrap: "wrap", 
+                  gap: "0.5rem" 
+                }}>
+                  {deckList.map((deck) => (
+                    <button
+                      key={deck.id}
+                      type="button"
+                      style={{
+                        padding: "0.5rem 0.9rem",
+                        borderRadius: "0.5rem",
+                        border: activeDeck === deck.id 
+                          ? "2px solid #d8b25d" 
+                          : selectedDeckId === deck.id 
+                            ? "2px solid var(--accent)" 
+                            : "2px solid var(--border)",
+                        background: activeDeck === deck.id 
+                          ? "linear-gradient(135deg, rgba(216,178,93,0.2), rgba(9,10,14,0.3))" 
+                          : "var(--bg)",
+                        color: "var(--text)",
+                        fontSize: "0.9rem",
+                        cursor: "pointer"
+                      }}
+                      onClick={() => setSelectedDeckId(deck.id)}
+                    >
+                      {deck.name}
+                      {activeDeck === deck.id && " ✓"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedDeckId && decks[selectedDeckId] && (
+              <div style={{ 
+                padding: "0.7rem",
+                background: "linear-gradient(135deg, rgba(147,112,219,0.1), rgba(9,10,14,0.3))",
+                borderRadius: "0.5rem",
+                border: "1px solid rgba(147,112,219,0.35)",
+                marginBottom: "0.6rem"
+              }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  marginBottom: "0.5rem"
+                }}>
+                  <div style={{ fontWeight: 700 }}>
+                    「{decks[selectedDeckId].name}」
+                    <span style={{ 
+                      marginLeft: "0.5rem", 
+                      fontSize: "0.85rem", 
+                      color: "var(--muted)" 
+                    }}>
+                      ({decks[selectedDeckId].cardIds.length} 张卡牌)
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <button
+                      type="button"
+                      className="btn btn-paper"
+                      onClick={() => setActiveDeck(
+                        activeDeck === selectedDeckId ? null : selectedDeckId
+                      )}
+                    >
+                      {activeDeck === selectedDeckId ? "取消激活" : "设为激活"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleDeleteDeck(selectedDeckId)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+                
+                {currentSkills.length > 0 && activeDeck === selectedDeckId && (
+                  <div style={{ 
+                    padding: "0.5rem",
+                    background: "var(--bg-2)",
+                    borderRadius: "0.4rem",
+                    marginTop: "0.5rem"
+                  }}>
+                    <div style={{ 
+                      fontSize: "0.82rem", 
+                      fontWeight: 700, 
+                      color: "var(--text)", 
+                      marginBottom: "0.3rem" 
+                    }}>
+                      当前卡组技能：
+                    </div>
+                    {currentSkills.map((skill) => (
+                      <div key={skill.id} style={{ 
+                        fontSize: "0.8rem", 
+                        color: "var(--muted)",
+                        marginTop: "0.2rem"
+                      }}>
+                        • {skill.name}：{skill.description}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ 
+                  fontSize: "0.8rem", 
+                  color: "var(--muted)",
+                  marginTop: "0.4rem"
+                }}>
+                  提示：点击下方的卡牌可以添加/移除到当前卡组（仅已拥有的卡牌可添加）
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="treasure-toolbar">
@@ -2075,10 +2927,16 @@ function CollectionTab() {
         {list.map((c) => {
           const n = inventory[c.id] ?? 0;
           const hasPortrait = !!portraitUrlForId(c.id);
+          const isInDeck = selectedDeckId && decks[selectedDeckId]?.cardIds.includes(c.id);
+          const canAddToDeck = selectedDeckId && n > 0;
           return (
             <div
               key={c.id}
               className={`treasure-card ${n > 0 ? "owned" : "locked"} ${hasPortrait ? "has-portrait" : ""} ${rarityTierClass(c.rarity)}`}
+              style={{ 
+                outline: isInDeck ? "3px solid #667eea" : "none",
+                outlineOffset: "-3px"
+              }}
             >
               <div className="treasure-art" style={{ backgroundImage: `url("${getArt(c)}")` }} />
               <div className="treasure-top">
@@ -2101,6 +2959,27 @@ function CollectionTab() {
                     </span>
                   ))}
                 </div>
+                {canAddToDeck && (
+                  <button
+                    type="button"
+                    style={{
+                      marginTop: "0.4rem",
+                      padding: "0.3rem 0.6rem",
+                      borderRadius: "0.4rem",
+                      border: "1px solid var(--border)",
+                      background: isInDeck ? "rgba(102,126,234,0.2)" : "var(--bg-2)",
+                      color: "var(--text)",
+                      fontSize: "0.75rem",
+                      cursor: "pointer"
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleCardInDeck(c.id);
+                    }}
+                  >
+                    {isInDeck ? "移出卡组" : "加入卡组"}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -2124,6 +3003,28 @@ function CardDetailModal({
   count: number;
 }) {
   const artCacheRef = useRef<Map<string, string>>(new Map());
+  const cardLevels = useGameStore((s) => s.cardLevels);
+  const cardBreakthroughs = useGameStore((s) => s.cardBreakthroughs);
+  const upgradeCard = useGameStore((s) => s.upgradeCard);
+  const breakthroughCard = useGameStore((s) => s.breakthroughCard);
+  const coins = useGameStore((s) => s.coins);
+  const currentLevel = cardLevels[card.id] ?? 1;
+  const upgradeCost = currentLevel * 100;
+  const canUpgrade = count > 0 && currentLevel < 10 && coins >= upgradeCost;
+  
+  const currentBreakthrough = cardBreakthroughs[card.id] ?? 0;
+  const BREAKTHROUGH_LEVELS = [
+    { level: 1, requiredCards: 3, requiredCoins: 500, bonusDescription: "技能效果+10%" },
+    { level: 2, requiredCards: 5, requiredCoins: 1000, bonusDescription: "技能效果+20%" },
+    { level: 3, requiredCards: 10, requiredCoins: 2500, bonusDescription: "技能效果+35%" },
+  ];
+  const nextBreakthrough = BREAKTHROUGH_LEVELS[currentBreakthrough];
+  const canBreakthrough = 
+    count > 0 && 
+    currentBreakthrough < BREAKTHROUGH_LEVELS.length && 
+    nextBreakthrough && 
+    count >= nextBreakthrough.requiredCards && 
+    coins >= nextBreakthrough.requiredCoins;
 
   const getArt = (c: (typeof CARDS)[number]) => {
     const cached = artCacheRef.current.get(c.id);
@@ -2159,6 +3060,31 @@ function CardDetailModal({
       case "月": return "阴柔之美，神秘莫测";
       case "星": return "灵动之机，变幻无常";
       default: return "自然之道，顺应天时";
+    }
+  };
+
+  const getSkillEffect = () => {
+    if (card.rarity === "SSR") {
+      const bonus = 5 + currentLevel * 2;
+      return `SSR 卡牌技能：略微提升运气（${bonus}% SSR、${Math.floor(bonus * 0.5)}% SR 概率加成）`;
+    } else if (card.rarity === "SR") {
+      const bonus = Math.floor(currentLevel / 2);
+      return `SR 卡牌技能：减少保底进度（${bonus} 抽）`;
+    }
+    return "该稀有度暂无技能效果";
+  };
+
+  const handleUpgrade = () => {
+    const result = upgradeCard(card.id);
+    if (!result.success) {
+      alert(result.error);
+    }
+  };
+
+  const handleBreakthrough = () => {
+    const result = breakthroughCard(card.id);
+    if (!result.success) {
+      alert(result.error);
     }
   };
 
@@ -2213,6 +3139,165 @@ function CardDetailModal({
                 }
               </div>
             </div>
+
+            {count > 0 && (
+              <div style={{ 
+                marginBottom: "1rem", 
+                padding: "0.7rem",
+                background: "linear-gradient(135deg, rgba(216,178,93,0.1), rgba(9,10,14,0.3))",
+                borderRadius: "0.6rem",
+                border: "1px solid rgba(216,178,93,0.35)"
+              }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  marginBottom: "0.6rem"
+                }}>
+                  <span style={{ fontWeight: 700, color: "var(--text)" }}>卡牌等级</span>
+                  <span style={{ 
+                    fontFamily: "\"JetBrains Mono\", monospace", 
+                    fontSize: "1.2rem",
+                    fontWeight: 800,
+                    color: "#d8b25d"
+                  }}>
+                    Lv.{currentLevel}/10
+                  </span>
+                </div>
+                <div style={{ marginBottom: "0.6rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+                  {getSkillEffect()}
+                </div>
+                {currentLevel < 10 && (
+                  <div style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "center",
+                    gap: "0.6rem"
+                  }}>
+                    <div style={{ 
+                      flex: 1,
+                      fontSize: "0.85rem",
+                      color: "var(--muted)"
+                    }}>
+                      升级消耗：<span style={{ 
+                        fontFamily: "\"JetBrains Mono\", monospace", 
+                        color: coins >= upgradeCost ? "var(--accent)" : "var(--danger)"
+                      }}>
+                        {upgradeCost} 灵石
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleUpgrade}
+                      disabled={!canUpgrade}
+                    >
+                      升级
+                    </button>
+                  </div>
+                )}
+                {currentLevel >= 10 && (
+                  <div style={{ 
+                    fontSize: "0.85rem",
+                    color: "#d8b25d",
+                    fontWeight: 700,
+                    textAlign: "center"
+                  }}>
+                    ✨ 已达到最高等级！
+                  </div>
+                )}
+              </div>
+            )}
+
+            {count > 0 && (currentBreakthrough > 0 || (card.rarity === "SSR" || card.rarity === "SR")) && (
+              <div style={{ 
+                marginBottom: "1rem", 
+                padding: "0.7rem",
+                background: "linear-gradient(135deg, rgba(147,112,219,0.1), rgba(9,10,14,0.3))",
+                borderRadius: "0.6rem",
+                border: "1px solid rgba(147,112,219,0.35)"
+              }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  marginBottom: "0.6rem"
+                }}>
+                  <span style={{ fontWeight: 700, color: "var(--text)" }}>突破等级</span>
+                  <span style={{ 
+                    fontFamily: "\"JetBrains Mono\", monospace", 
+                    fontSize: "1.2rem",
+                    fontWeight: 800,
+                    color: "#9370db"
+                  }}>
+                    突破 {currentBreakthrough}/3
+                  </span>
+                </div>
+                {currentBreakthrough > 0 && (
+                  <div style={{ 
+                    marginBottom: "0.6rem", 
+                    fontSize: "0.82rem", 
+                    color: "var(--muted)" 
+                  }}>
+                    当前加成：技能效果 +{currentBreakthrough >= 3 ? 35 : currentBreakthrough >= 2 ? 20 : 10}%
+                  </div>
+                )}
+                {currentBreakthrough < 3 && nextBreakthrough && (
+                  <div style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "flex-start",
+                    gap: "0.6rem",
+                    flexDirection: "column"
+                  }}>
+                    <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
+                      下一突破：{nextBreakthrough.bonusDescription}
+                    </div>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
+                      gap: "0.6rem",
+                      width: "100%"
+                    }}>
+                      <div style={{ flex: 1, fontSize: "0.85rem", color: "var(--muted)" }}>
+                        需要：<span style={{ 
+                          fontFamily: "\"JetBrains Mono\", monospace", 
+                          color: count >= nextBreakthrough.requiredCards ? "var(--success)" : "var(--danger)"
+                        }}>
+                          {nextBreakthrough.requiredCards} 张
+                        </span>
+                        {" · "}
+                        <span style={{ 
+                          fontFamily: "\"JetBrains Mono\", monospace", 
+                          color: coins >= nextBreakthrough.requiredCoins ? "var(--accent)" : "var(--danger)"
+                        }}>
+                          {nextBreakthrough.requiredCoins} 灵石
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={handleBreakthrough}
+                        disabled={!canBreakthrough}
+                      >
+                        突破
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {currentBreakthrough >= 3 && (
+                  <div style={{ 
+                    fontSize: "0.85rem",
+                    color: "#9370db",
+                    fontWeight: 700,
+                    textAlign: "center"
+                  }}>
+                    ⭐ 已达到最高突破！
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ 
               marginTop: "0.8rem", 
@@ -2323,8 +3408,16 @@ function SettingsTab() {
   const freePulls = useGameStore((s) => s.freePulls);
   const streak = useGameStore((s) => s.streak);
   const totalPulls = useGameStore((s) => s.totalPulls);
+  const cloudSaveEnabled = useGameStore((s) => s.cloudSaveEnabled);
+  const cloudLastSavedAt = useGameStore((s) => s.cloudLastSavedAt);
+  const cloudLastSyncedAt = useGameStore((s) => s.cloudLastSyncedAt);
+  const toggleCloudSave = useGameStore((s) => s.toggleCloudSave);
+  const saveToCloud = useGameStore((s) => s.saveToCloud);
+  const loadFromCloud = useGameStore((s) => s.loadFromCloud);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [savingToCloud, setSavingToCloud] = useState(false);
+  const [loadingFromCloud, setLoadingFromCloud] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -2369,6 +3462,36 @@ function SettingsTab() {
     }
   };
 
+  const handleSaveToCloud = async () => {
+    setSavingToCloud(true);
+    const result = await saveToCloud();
+    if (result.success) {
+      alert("存档已保存到云端！");
+    } else {
+      alert(`保存失败：${result.error}`);
+    }
+    setSavingToCloud(false);
+  };
+
+  const handleLoadFromCloud = async () => {
+    if (!confirm("从云端加载存档会覆盖当前本地存档，确定要继续吗？")) {
+      return;
+    }
+    setLoadingFromCloud(true);
+    const result = await loadFromCloud();
+    if (result.success) {
+      if (result.hasData) {
+        alert("云端存档加载成功！");
+        location.reload();
+      } else {
+        alert("云端没有找到存档。");
+      }
+    } else {
+      alert(`加载失败：${result.error}`);
+    }
+    setLoadingFromCloud(false);
+  };
+
   return (
     <div className="panel scroll-panel">
       <div className="scroll-banner" aria-hidden />
@@ -2410,7 +3533,66 @@ function SettingsTab() {
       </div>
 
       <div className="scroll-section">
-        <div className="scroll-section-title">存档管理</div>
+        <div className="scroll-section-title">云存档</div>
+        <div className="scroll-list">
+          <div className="scroll-item scroll-item-clickable" onClick={toggleCloudSave}>
+            <div className="scroll-main">
+              <div className="scroll-row1">
+                <span className="scroll-name">云存档功能</span>
+                <span className="scroll-meta">{cloudSaveEnabled ? "已启用" : "未启用"}</span>
+              </div>
+              <div className="scroll-row2">开启后可以将存档同步到云端，跨设备访问。</div>
+            </div>
+            <div className={`toggle ${cloudSaveEnabled ? "on" : ""}`}>
+              <div className="toggle-dot" />
+            </div>
+          </div>
+
+          {cloudSaveEnabled && (
+            <>
+              <div className="scroll-item">
+                <div className="scroll-main">
+                  <div className="scroll-row1">
+                    <span className="scroll-name">同步状态</span>
+                    <span className="scroll-meta">
+                      {cloudLastSavedAt 
+                        ? `上次保存：${new Date(cloudLastSavedAt).toLocaleString("zh-CN")}`
+                        : "尚未保存到云端"}
+                    </span>
+                  </div>
+                  {cloudLastSyncedAt && (
+                    <div className="scroll-row2">
+                      上次同步：{new Date(cloudLastSyncedAt).toLocaleString("zh-CN")}
+                    </div>
+                  )}
+                  <div className="scroll-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveToCloud}
+                      disabled={savingToCloud}
+                    >
+                      {savingToCloud ? "保存中…" : "保存到云端"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-paper"
+                      onClick={handleLoadFromCloud}
+                      disabled={loadingFromCloud}
+                    >
+                      {loadingFromCloud ? "加载中…" : "从云端加载"}
+                    </button>
+                  </div>
+                </div>
+                <div className="seal-tag">云</div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="scroll-section">
+        <div className="scroll-section-title">本地存档</div>
         <div className="scroll-list">
           <div className="scroll-item">
             <div className="scroll-main">

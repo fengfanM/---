@@ -2,14 +2,14 @@ import type { CardDef, PoolDef, PullResult, Rarity } from "../../types";
 import { createRng, pickWeighted } from "../../lib/rng";
 
 const BASE_WEIGHTS: Record<Rarity, number> = {
-  N: 58,
-  R: 28,
-  SR: 12,
-  SSR: 2,
+  N: 52,
+  R: 30,
+  SR: 14.5,
+  SSR: 3.5,
 };
 
 const PITY_10 = 10;
-const PITY_60 = 60;
+const PITY_50 = 50;
 
 export function rollSinglePull(
   cards: CardDef[],
@@ -29,21 +29,33 @@ export function rollSinglePull(
 
   let rarity: Rarity;
   const weights = { ...BASE_WEIGHTS };
+  
   if (wheelBuff) {
     weights.SR += weights.SR * wheelBuff.srBonus;
     weights.SSR += weights.SSR * wheelBuff.ssrBonus;
   }
 
-  if (pullsSinceSSR >= PITY_60 - 1) {
+  if (pullsSinceSSR >= PITY_50 - 1) {
     rarity = "SSR";
     wasPitySSR = true;
   } else if (pullsSinceSR >= PITY_10 - 1) {
-    rarity = rng() < 0.35 ? "SSR" : "SR";
+    rarity = rng() < 0.4 ? "SSR" : "SR";
     wasPitySR = true;
   } else {
-    const entries = (Object.keys(weights) as Rarity[]).map((r) => ({
+    const adjustedWeights = { ...weights };
+    
+    if (pullsSinceSSR >= 30) {
+      const multiplier = 1 + (pullsSinceSSR - 30) * 0.2;
+      adjustedWeights.SSR *= multiplier;
+    }
+    
+    if (pullsSinceSR >= 7) {
+      adjustedWeights.SR *= 1.5;
+    }
+    
+    const entries = (Object.keys(adjustedWeights) as Rarity[]).map((r) => ({
       item: r,
-      weight: weights[r],
+      weight: adjustedWeights[r],
     }));
     rarity = pickWeighted(entries, rng);
   }
