@@ -547,7 +547,7 @@ export default function App() {
             天机
           </div>
           <div>
-            <h1 className="brand-title">天机抽卡</h1>
+            <h1 className="brand-title">✨ 天机抽卡 ✨</h1>
             <p className="sub">算命 · 占卜 · 抽卡 · 本地存档（纯前端）</p>
           </div>
         </div>
